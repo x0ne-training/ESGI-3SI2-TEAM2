@@ -6,11 +6,10 @@ module.exports = {
         // Ignorer les messages du bot lui-même
         if (message.author.bot) return;
 
-        // Vérifier si le message contient "quoi" (insensible à la casse)
         const messageContent = message.content.toLowerCase().trim();
-        
-        // Répondre "FEUR"
-        if (messageContent === 'quoi' || messageContent.includes('quoi')) {
+
+        // Utiliser une regex pour vérifier si le dernier mot finit par "quoi"
+        if (/\b\w*quoi\b$/i.test(messageContent)) {
             try {
                 await message.reply('FEUR');
                 console.log(` ${message.author.tag} a dit "${message.content}" → Réponse: FEUR`);
