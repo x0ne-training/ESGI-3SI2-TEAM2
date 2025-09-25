@@ -12,6 +12,7 @@ module.exports = {
             .addFields(
                 { name: '🏓 /ping', value: 'Affiche la latence du bot', inline: true },
                 { name: '❓ /help', value: 'Affiche cette aide', inline: true },
+                { name: '🖼️ /avatar', value: 'Affiche l\'avatar d\'un utilisateur', inline: true },
             )
             .setFooter({ 
                 text: 'Bot Discord 3SIB', 
