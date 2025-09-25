@@ -63,6 +63,8 @@ npm run dev
 ├── events/            # Gestionnaires d'événements
 ├── config/            # Fichiers de configuration
 ├── utils/             # Utilitaires et helpers
+├── server/            # Backend Express pour le dashboard
+├── public/            # Contenus statiques dashboard 
 ├── index.js           # Point d'entrée principal
 ├── deploy-commands.js # Script de déploiement des commandes
 └── package.json       # Dépendances et scripts
