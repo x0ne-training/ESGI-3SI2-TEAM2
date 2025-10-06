@@ -13,7 +13,7 @@ Un bot Discord développé en JavaScript pour le serveur 3SIB.
 1. Clonez ce repository :
 ```bash
 git clone <url-du-repository>
-cd 3SIB-Discord-Bot
+cd ESGI-3SI2-TEAM2
 ```
 
 2. Installez les dépendances :
@@ -58,7 +58,7 @@ npm run dev
 ## Structure du projet
 
 ```
-3SIB-Discord-Bot/
+ESGI-3SI2-TEAM2/
 ├── commands/          # Commandes du bot
 ├── events/            # Gestionnaires d'événements
 ├── config/            # Fichiers de configuration
