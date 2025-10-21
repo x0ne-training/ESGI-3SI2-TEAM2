@@ -19,6 +19,6 @@ module.exports = {
     const rolls = []
     for (let i = 0; i < count; i++) rolls.push(Math.floor(Math.random() * sides) + 1)
     const total = rolls.reduce((a, b) => a + b, 0)
-    await interaction.reply(`Rolls: ${rolls.join(', ')}\nTotal: ${total}`)
+    await interaction.reply(`Rolling ${count}d${sides}: ${rolls.join(', ')}\nTotal: ${total}`)
   }
 }
