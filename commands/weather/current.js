@@ -17,7 +17,12 @@ module.exports = {
             await interaction.deferReply();
             
             // Using OpenWeatherMap API (free tier)
-            const API_KEY = process.env.OPENWEATHER_API_KEY || 'demo_key';
+            const API_KEY = process.env.OPENWEATHER_API_KEY;
+            if (!API_KEY) {
+                console.error('OPENWEATHER_API_KEY environment variable is not set.');
+                await interaction.editReply('❌ La clé API OpenWeatherMap est manquante. Contactez l\'administrateur.');
+                return;
+            }
             const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric&lang=fr`;
             
             const response = await axios.get(url);
