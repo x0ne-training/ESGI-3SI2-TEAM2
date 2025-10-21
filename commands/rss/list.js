@@ -9,6 +9,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('rss-list')
         .setDescription('Affiche la liste des flux RSS configurés sur ce serveur'),
+    emoji: '📋',
 
     async execute(interaction) {
         try {

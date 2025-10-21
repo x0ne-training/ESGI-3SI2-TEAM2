@@ -29,6 +29,7 @@ module.exports = {
                 .setDescription('Nom personnalisé pour ce flux RSS (optionnel)')
                 .setRequired(false)
         ),
+    emoji: '⚙️',
 
     async execute(interaction) {
         // Vérifier que l'utilisateur a les permissions d'administrateur

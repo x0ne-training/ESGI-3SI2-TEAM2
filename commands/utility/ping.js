@@ -4,6 +4,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('ping')
         .setDescription('Affiche la latence du bot'),
+    emoji: '🏓',
     async execute(interaction) {
         const sent = await interaction.reply({ 
             content: 'Pong! 🏓', 

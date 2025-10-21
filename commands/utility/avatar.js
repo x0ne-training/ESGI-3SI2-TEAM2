@@ -10,6 +10,7 @@ module.exports = {
                 .setDescription('L\'utilisateur dont vous voulez voir l\'avatar')
                 .setRequired(false)
         ),
+    emoji: '🖼️',
     async execute(interaction) {
         // Si aucun utilisateur n'est spécifié, utiliser l'utilisateur qui a exécuté la commande
         const user = interaction.options.getUser('utilisateur') || interaction.user;
