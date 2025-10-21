@@ -13,6 +13,8 @@ module.exports = {
                 { name: '🏓 /ping', value: 'Affiche la latence du bot', inline: true },
                 { name: '❓ /help', value: 'Affiche cette aide', inline: true },
                 { name: '🖼️ /avatar', value: 'Affiche l\'avatar d\'un utilisateur', inline: true },
+                { name: '🌤️ /weather', value: 'Affiche la météo actuelle d\'une ville', inline: true },
+                { name: '📅 /forecast', value: 'Affiche les prévisions météo sur 5 jours', inline: true },
             )
             .setFooter({ 
                 text: 'Bot Discord 3SIB', 
