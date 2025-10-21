@@ -16,6 +16,7 @@ module.exports = {
                 .setRequired(true)
                 .setAutocomplete(true)
         ),
+    emoji: '🗑️',
 
     async execute(interaction) {
         // Vérifier que l'utilisateur a les permissions d'administrateur
