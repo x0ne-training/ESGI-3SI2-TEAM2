@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, MessageFlags } = require('discord.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -49,7 +49,7 @@ module.exports = {
 		collector.on('collect', async (btnInteraction) => {
 			if (btnInteraction.user.bot) return;
 			if (voterIds.has(btnInteraction.user.id)) {
-				return btnInteraction.reply({ content: 'Vous avez déjà voté.', ephemeral: true });
+				return btnInteraction.reply({ content: 'Vous avez déjà voté.', flags: MessageFlags.Ephemeral });
 			}
 			voterIds.add(btnInteraction.user.id);
 			if (btnInteraction.customId === 'poll_yes') yesCount += 1; else if (btnInteraction.customId === 'poll_no') noCount += 1;
