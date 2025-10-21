@@ -37,6 +37,7 @@ module.exports = {
         .addChannelTypes(ChannelType.GuildText)
         .setRequired(false)
     ),
+    emoji: '💬',
 
   async execute(interaction) {
     const raw = interaction.options.getString("message", true);
