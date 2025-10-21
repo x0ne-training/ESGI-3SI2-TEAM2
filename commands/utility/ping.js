@@ -24,6 +24,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('ping')
         .setDescription('Affiche la latence du bot'),
+    // Métadonnées pour la commande help
 
     emoji: '🏓',
     async execute(interaction) {

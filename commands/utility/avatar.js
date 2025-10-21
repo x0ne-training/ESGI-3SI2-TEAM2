@@ -34,6 +34,8 @@ module.exports = {
                 .setDescription('L\'utilisateur dont vous voulez voir l\'avatar')
                 .setRequired(false)
         ),
+    // Métadonnées pour la commande help
+    emoji: '🖼️',
 
     async execute(interaction) {
         // Si aucun utilisateur n'est spécifié, utiliser l'utilisateur qui a exécuté la commande
