@@ -9,6 +9,7 @@ module.exports = {
             option.setName('ville')
                 .setDescription('Nom de la ville')
                 .setRequired(true)),
+    emoji: '📅',
     async execute(interaction) {
         const city = interaction.options.getString('ville');
         
