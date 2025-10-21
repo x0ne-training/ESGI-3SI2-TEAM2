@@ -52,7 +52,11 @@ module.exports = {
 				return btnInteraction.reply({ content: 'Vous avez déjà voté.', flags: MessageFlags.Ephemeral });
 			}
 			voterIds.add(btnInteraction.user.id);
-			if (btnInteraction.customId === 'poll_yes') yesCount += 1; else if (btnInteraction.customId === 'poll_no') noCount += 1;
+			if (btnInteraction.customId === 'poll_yes') {
+				yesCount += 1;
+			} else if (btnInteraction.customId === 'poll_no') {
+				noCount += 1;
+			}
 
 			pollEmbed.spliceFields(0, 2, { name: 'Oui', value: String(yesCount), inline: true }, { name: 'Non', value: String(noCount), inline: true });
 			await btnInteraction.update({ embeds: [pollEmbed] });
