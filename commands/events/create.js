@@ -267,7 +267,7 @@ function parseDateTime(dateStr, timeStr) {
 }
 
 function generateEventId(guildId) {
-    return `${guildId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `${guildId}_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 }
 
 function loadEventsConfig() {
