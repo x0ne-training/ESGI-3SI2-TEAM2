@@ -1,6 +1,6 @@
 const { Events } = require("discord.js");
 const fs = require("fs");
-const statsCommand = require("../commands/utility/stats");
+
 
 // Charger les statistiques depuis le fichier JSON
 let stats = {};
@@ -14,6 +14,17 @@ module.exports = {
     // Ignorer les messages du bot
     if (message.author.bot) return;
 
+    // Incrémenter le compteur
+    const userId = message.author.id;
+    stats[userId] = (stats[userId] || 0) + 1;
+
+    // Sauvegarder
+    try {
+      fs.writeFileSync(STATS_PATH, JSON.stringify(stats, null, 2));
+    } catch (e) {
+      console.error("Erreur d'écriture de stats.json :", e);
+    }
+
     // --- Fonctionnalité "quoi → feur" ---
     const messageContent = message.content.toLowerCase().trim();
     if (/\bquoi\b$/i.test(messageContent)) {
@@ -24,8 +35,5 @@ module.exports = {
         console.error("Erreur lors de la réponse FEUR :", error);
       }
     }
-
-    // --- Exécuter la commande de statistiques ---
-    statsCommand.execute(message, stats);
   },
 };
