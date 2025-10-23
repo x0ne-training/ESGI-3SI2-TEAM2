@@ -107,3 +107,4 @@ Thumbs.db
 # Bot specific
 config.json
 bot-config.json
+sats.json
