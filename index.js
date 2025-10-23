@@ -1,6 +1,8 @@
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
+const ReminderSystem = require('./events/reminderSystem');
+const RecurringEventsManager = require('./events/recurringEvents');
 require('dotenv').config();
 
 // Créer une nouvelle instance client
@@ -15,6 +17,10 @@ const client = new Client({
 
 // Collection pour stocker les commandes
 client.commands = new Collection();
+
+// Initialiser les systèmes d'événements
+let reminderSystem;
+let recurringEventsManager;
 
 // Charger les commandes
 const foldersPath = path.join(__dirname, 'commands');
@@ -66,6 +72,14 @@ client.once(Events.ClientReady, readyClient => {
     
     // Définir le statut du bot
     client.user.setActivity('3SIB Server', { type: 3 }); // 3 = WATCHING
+    
+    // Initialiser les systèmes d'événements après la connexion
+    reminderSystem = new ReminderSystem(client);
+    recurringEventsManager = new RecurringEventsManager(client);
+    
+    // Rendre les systèmes accessibles globalement
+    client.reminderSystem = reminderSystem;
+    client.recurringEventsManager = recurringEventsManager;
 });
 
 // Gestion des erreurs
