@@ -1,0 +1,25 @@
+{
+  "name": "bot-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/x0ne-training/ESGI-3SI2-TEAM2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/x0ne-training/ESGI-3SI2-TEAM2/issues"
+  },
+  "homepage": "https://github.com/x0ne-training/ESGI-3SI2-TEAM2#readme",
+  "dependencies": {
+    "discord.js": "^14.23.2",
+    "dotenv": "^17.2.3"
+  }
+}
