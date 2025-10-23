@@ -36,6 +36,7 @@ module.exports = {
         ),
     // Métadonnées pour la commande help
     emoji: '🖼️',
+
     async execute(interaction) {
         // Si aucun utilisateur n'est spécifié, utiliser l'utilisateur qui a exécuté la commande
         const user = interaction.options.getUser('utilisateur') || interaction.user;

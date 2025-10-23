@@ -25,6 +25,7 @@ module.exports = {
         .setName('ping')
         .setDescription('Affiche la latence du bot'),
     // Métadonnées pour la commande help
+
     emoji: '🏓',
     async execute(interaction) {
         const sent = await interaction.reply({ 
