@@ -1,4 +1,5 @@
 const { Events } = require('discord.js');
+const { handleEventInteraction } = require('./eventInteractions');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -40,7 +41,9 @@ module.exports = {
         // Gestion des boutons (pour de futures fonctionnalités)
         else if (interaction.isButton()) {
             console.log(`🔘 ${interaction.user.tag} a cliqué sur le bouton: ${interaction.customId}`);
-            // Ajouter ici la logique pour les boutons
+            
+            // Gérer les interactions d'événements
+            await handleEventInteraction(interaction);
         }
         
         // Gestion des menus déroulants (pour de futures fonctionnalités)
