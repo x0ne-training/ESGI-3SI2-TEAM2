@@ -4,6 +4,14 @@ const { handleEventInteraction } = require('./eventInteractions');
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
+
+        if (interaction.isAutocomplete()) {
+            const command = interaction.client.commands.get(interaction.commandName);
+            if (!command || !command.autocomplete) return;
+            await command.autocomplete(interaction);
+            return;
+        }
+
         // Gestion des commandes slash
         if (interaction.isChatInputCommand()) {
             const command = interaction.client.commands.get(interaction.commandName);

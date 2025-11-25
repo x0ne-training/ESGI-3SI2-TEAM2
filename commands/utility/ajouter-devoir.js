@@ -77,7 +77,7 @@ module.exports = {
       return interaction.reply({
         content:
           '❌ Format de date invalide. Utilise le format **AAAA-MM-JJ**.',
-        ephemeral: true
+        flags: 64
       })
     }
 

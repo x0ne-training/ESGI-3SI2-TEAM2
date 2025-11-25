@@ -29,7 +29,7 @@ const TYPE_LABELS = {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('liste-devoirs')
-    .setDescription('Affiche la liste des devoirs / examens.')
+    .setDescription('Affiche la liste des devoirs / examens numérotés.')
     .addStringOption(option =>
       option
         .setName('type')
@@ -53,7 +53,7 @@ module.exports = {
     if (devoirs.length === 0) {
       return interaction.reply({
         content: '📭 Aucun élément correspondant n’a été trouvé.',
-        ephemeral: true
+        flags: 64
       })
     }
 
@@ -70,9 +70,10 @@ module.exports = {
 
     const desc = slice
       .map((d, i) => {
-        const label = TYPE_LABELS[d.type] || 'Devoir'
+        const num = i + 1
+        const typeLabel = TYPE_LABELS[d.type] || 'Devoir'
         return (
-          `**${i + 1}. ${d.titre}** (${label})\n` +
+          `**${num}. ${d.titre}** (${typeLabel})\n` +
           `📅 ${d.date}\n` +
           (d.description ? `📝 ${d.description}\n` : '') +
           `\u200b`
@@ -80,8 +81,7 @@ module.exports = {
       })
       .join('\n')
 
-    const title =
-      filterType && TYPE_LABELS[filterType]
+    const title = filterType
         ? `📚 ${TYPE_LABELS[filterType]}s`
         : '📚 Devoirs / Examens'
 
