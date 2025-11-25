@@ -1,7 +1,4 @@
-const {
-  SlashCommandBuilder,
-  EmbedBuilder
-} = require('discord.js')
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js')
 const fs = require('fs')
 const path = require('path')
 
@@ -27,14 +24,19 @@ function writeDevoirs (list) {
   }
 }
 
+const TYPE_LABELS = {
+  devoir: 'Devoir',
+  examen: 'Examen'
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ajouter-devoir')
-    .setDescription('Ajoute un devoir avec une date limite.')
+    .setDescription('Ajoute un devoir ou un examen avec une date limite.')
     .addStringOption(option =>
       option
         .setName('titre')
-        .setDescription('Titre du devoir')
+        .setDescription('Titre')
         .setRequired(true)
         .setMaxLength(100)
     )
@@ -46,8 +48,18 @@ module.exports = {
     )
     .addStringOption(option =>
       option
+        .setName('type')
+        .setDescription('Type : devoir ou examen')
+        .setRequired(true)
+        .addChoices(
+          { name: 'devoir', value: 'devoir' },
+          { name: 'examen', value: 'examen' }
+        )
+    )
+    .addStringOption(option =>
+      option
         .setName('description')
-        .setDescription('Description du devoir')
+        .setDescription('Description')
         .setRequired(false)
         .setMaxLength(1000)
     ),
@@ -56,6 +68,7 @@ module.exports = {
   async execute (interaction) {
     const titre = interaction.options.getString('titre', true)
     const dateStr = interaction.options.getString('date', true)
+    const type = interaction.options.getString('type', true)
     const description = interaction.options.getString('description') || ''
 
     // Vérification de la date
@@ -68,24 +81,26 @@ module.exports = {
       })
     }
 
-    // Sauvegarde du devoir
     const devoirs = readDevoirs()
     const newDevoir = {
       id: Date.now(),
       titre,
       date: dateStr,
-      description
+      description,
+      type
     }
     devoirs.push(newDevoir)
     writeDevoirs(devoirs)
 
-    // Confirmation
+    const label = TYPE_LABELS[type] || 'Devoir'
+
     const embed = new EmbedBuilder()
-      .setColor(0x2ecc71)
-      .setTitle('✅ Devoir ajouté')
+      .setColor(type === 'examen' ? 0x9b59b6 : 0x2ecc71)
+      .setTitle(`✅ ${label} ajouté`)
       .addFields(
         { name: '📘 Titre', value: titre },
-        { name: '📅 Date limite', value: dateStr },
+        { name: '🗂️ Type', value: label, inline: true },
+        { name: '📅 Date limite', value: dateStr, inline: true },
         { name: '📝 Description', value: description || 'Aucune' }
       )
       .setFooter({
@@ -94,6 +109,9 @@ module.exports = {
       })
       .setTimestamp()
 
-    await interaction.reply({ embeds: [embed], flags: 64 })
+    await interaction.reply({
+      embeds: [embed],
+      flags: 64
+    })
   }
 }
