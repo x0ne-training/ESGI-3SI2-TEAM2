@@ -1,4 +1,5 @@
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js');
+const { scheduleReminders } = require("./commands/utility/ajouter-devoir.js");
 const fs = require('node:fs');
 const path = require('node:path');
 const ReminderSystem = require('./events/reminderSystem');
@@ -80,6 +81,8 @@ client.once(Events.ClientReady, readyClient => {
     // Rendre les systèmes accessibles globalement
     client.reminderSystem = reminderSystem;
     client.recurringEventsManager = recurringEventsManager;
+
+    scheduleReminders(client);
 });
 
 // Gestion des erreurs
