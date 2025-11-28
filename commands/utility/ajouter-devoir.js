@@ -3,6 +3,7 @@ const fs = require('fs')
 const path = require('path')
 
 const DATA_FILE = path.join(__dirname, '../../data/devoirs.json')
+const CONFIG_FILE = path.join(__dirname, '../../data/devoirs-config.json')
 
 // Lecture / écriture des devoirs
 function readDevoirs () {
@@ -30,6 +31,31 @@ function writeDevoirs (list) {
   }
 }
 
+// Config des rôles de mention
+function readConfig () {
+  if (!fs.existsSync(CONFIG_FILE)) return {}
+  try {
+    const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
+    return typeof data === 'object' && data !== null ? data : {}
+  } catch (e) {
+    console.error('Erreur lecture devoirs-config.json :', e)
+    return {}
+  }
+}
+
+function writeConfig (cfg) {
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf-8')
+  } catch (e) {
+    console.error('Erreur écriture devoirs-config.json :', e)
+  }
+}
+
+function getGuildMentionConfig (guildId) {
+  const cfg = readConfig()
+  return cfg[guildId] || { roleId: null }
+}
+
 const TYPE_LABELS = {
   devoir: 'Devoir',
   examen: 'Examen'
@@ -38,7 +64,8 @@ const TYPE_LABELS = {
 // Rappels
 async function sendReminder (client, devoir, kind) {
   try {
-    if (!devoir.channelId) return
+    if (!devoir.channelId || !devoir.guildId) return
+
     const channel = await client.channels
       .fetch(devoir.channelId)
       .catch(() => null)
@@ -67,10 +94,19 @@ async function sendReminder (client, devoir, kind) {
       )
       .setTimestamp()
 
+    const mentionCfg = getGuildMentionConfig(devoir.guildId)
+    let content = '@everyone'
+    let allowedMentions = { parse: ['everyone'] }
+
+    if (mentionCfg.roleId) {
+      content = `<@&${mentionCfg.roleId}>`
+      allowedMentions = { roles: [mentionCfg.roleId] }
+    }
+
     await channel.send({
-      content: '@everyone',
+      content,
       embeds: [embed],
-      allowedMentions: { parse: ['everyone'] }
+      allowedMentions
     })
 
     console.log(
@@ -90,28 +126,21 @@ function scheduleReminders (client) {
     const deadline = new Date(devoir.date)
     if (isNaN(deadline)) continue
 
-    const deadlineMs = deadline.getTime()
+    const d7 = new Date(deadline)
+    d7.setDate(d7.getDate() - 7)
+    d7.setHours(8, 0, 0, 0)
+    const r7 = d7.getTime()
 
-    // J-7 à la même heure que la date
-    const r7 = deadlineMs - 7 * 24 * 60 * 60 * 1000
-
-    // J-1 à la même heure que la date
-    const r1 = deadlineMs - 24 * 60 * 60 * 1000
-
-    // J-1 à 18h45
-    const test = new Date(deadline)
-    test.setDate(test.getDate() - 1)
-    test.setHours(18, 45, 0, 0)
-    const rtest = test.getTime()
+    const d1 = new Date(deadline)
+    d1.setDate(d1.getDate() - 1)
+    d1.setHours(8, 0, 0, 0)
+    const r1 = d1.getTime()
 
     if (r7 > now) {
       setTimeout(() => sendReminder(client, devoir, '7d'), r7 - now)
     }
     if (r1 > now) {
       setTimeout(() => sendReminder(client, devoir, '1d'), r1 - now)
-    }
-    if (rtest > now) {
-      setTimeout(() => sendReminder(client, devoir, '1d-test'), rtest - now)
     }
   }
 
@@ -125,9 +154,7 @@ function scheduleReminders (client) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ajouter-devoir')
-    .setDescription(
-      'Ajoute un devoir ou un examen avec rappels J-7, J-1.' // ouais ça va ping à minuit si mes calculs sont bons et alors ?
-    )
+    .setDescription('Ajoute un devoir ou un examen avec rappels J-7 et J-1.')
     .addStringOption(option =>
       option
         .setName('titre')
@@ -214,15 +241,16 @@ module.exports = {
 
     // Programmation des rappels pour CE devoir uniquement (j'en ai marre de cette fonctionnalité 😭)
     const now = Date.now()
-    const deadlineMs = deadline.getTime()
 
-    const r7 = deadlineMs - 7 * 24 * 60 * 60 * 1000
-    const r1 = deadlineMs - 24 * 60 * 60 * 1000
+    const d7 = new Date(deadline)
+    d7.setDate(d7.getDate() - 7)
+    d7.setHours(8, 0, 0, 0)
+    const r7 = d7.getTime()
 
-    const test = new Date(deadline)
-    test.setDate(test.getDate() - 1)
-    test.setHours(21, 30, 0, 0)
-    const rtest = test.getTime()
+    const d1 = new Date(deadline)
+    d1.setDate(d1.getDate() - 1)
+    d1.setHours(8, 0, 0, 0)
+    const r1 = d1.getTime()
 
     if (r7 > now) {
       setTimeout(
@@ -236,12 +264,6 @@ module.exports = {
         r1 - now
       )
     }
-    // if (rtest > now) {
-    //   setTimeout(
-    //     () => sendReminder(interaction.client, newDevoir, '1d-test'),
-    //     rtest - now
-    //   )
-    // }
   },
 
   scheduleReminders
