@@ -15,6 +15,7 @@ function readDevoirs () {
       type: d.type || 'devoir',
       guildId: d.guildId || null,
       channelId: d.channelId || null,
+      customTimings: Array.isArray(d.customTimings) ? d.customTimings : [],
       ...d
     }))
   } catch (e) {
@@ -31,7 +32,7 @@ function writeDevoirs (list) {
   }
 }
 
-// Config des rôles de mention
+// Config des rôles de mention + timings serveur
 function readConfig () {
   if (!fs.existsSync(CONFIG_FILE)) return {}
   try {
@@ -51,9 +52,33 @@ function writeConfig (cfg) {
   }
 }
 
-function getGuildMentionConfig (guildId) {
+function getGuildConfig (guildId) {
   const cfg = readConfig()
-  return cfg[guildId] || { roleId: null }
+  const raw = cfg[guildId] || {}
+  return {
+    roleId: raw.roleId || null,
+    customTimings: Array.isArray(raw.customTimings) ? raw.customTimings : []
+  }
+}
+
+// convertit "3j", "12h", "1h30", "45m" -> ms
+function parseOffset (str) {
+  if (!str) return null
+  str = str.toLowerCase().replace(/\s+/g, '')
+
+  let total = 0
+
+  const days = str.match(/(\d+)j/)
+  if (days) total += parseInt(days[1]) * 24 * 60 * 60 * 1000
+
+  const hours = str.match(/(\d+)h/)
+  if (hours) total += parseInt(hours[1]) * 60 * 60 * 1000
+
+  const mins = str.match(/(\d+)m/)
+  if (mins) total += parseInt(mins[1]) * 60 * 1000
+
+  if (total <= 0) return null
+  return total
 }
 
 const TYPE_LABELS = {
@@ -73,20 +98,25 @@ async function sendReminder (client, devoir, kind) {
 
     const typeLabel = TYPE_LABELS[devoir.type] || 'Devoir'
 
-    const is7d = kind === '7d'
+    let description
+    if (kind === '7d') {
+      description = `Le ${typeLabel.toLowerCase()} **${
+        devoir.titre
+      }** est à rendre dans **7 jours** (le ${devoir.date}).`
+    } else if (kind === '1d-morning' || kind === '1d-evening') {
+      description = `Le ${typeLabel.toLowerCase()} **${
+        devoir.titre
+      }** est à rendre **demain** (${devoir.date}).`
+    } else {
+      description = `Rappel pour le ${typeLabel.toLowerCase()} **${
+        devoir.titre
+      }** (échéance le ${devoir.date}).`
+    }
 
     const embed = new EmbedBuilder()
-      .setColor(is7d ? 0xf1c40f : 0xe74c3c)
+      .setColor(kind === '7d' ? 0xf1c40f : 0xe74c3c)
       .setTitle(`📢 Rappel ${typeLabel}`)
-      .setDescription(
-        is7d
-          ? `Le ${typeLabel.toLowerCase()} **${
-              devoir.titre
-            }** est à rendre dans **7 jours** (le ${devoir.date}).`
-          : `Le ${typeLabel.toLowerCase()} **${
-              devoir.titre
-            }** est à rendre **demain** (${devoir.date}).`
-      )
+      .setDescription(description)
       .addFields(
         { name: '📘 Titre', value: devoir.titre },
         { name: '📅 Date limite', value: devoir.date },
@@ -94,13 +124,13 @@ async function sendReminder (client, devoir, kind) {
       )
       .setTimestamp()
 
-    const mentionCfg = getGuildMentionConfig(devoir.guildId)
+    const guildCfg = getGuildConfig(devoir.guildId)
     let content = '@everyone'
     let allowedMentions = { parse: ['everyone'] }
 
-    if (mentionCfg.roleId) {
-      content = `<@&${mentionCfg.roleId}>`
-      allowedMentions = { roles: [mentionCfg.roleId] }
+    if (guildCfg.roleId) {
+      content = `<@&${guildCfg.roleId}>`
+      allowedMentions = { roles: [guildCfg.roleId] }
     }
 
     await channel.send({
@@ -126,6 +156,8 @@ function scheduleReminders (client) {
     const deadline = new Date(devoir.date)
     if (isNaN(deadline)) continue
 
+    const deadlineMs = deadline.getTime()
+
     const d7 = new Date(deadline)
     d7.setDate(d7.getDate() - 7)
     d7.setHours(8, 0, 0, 0)
@@ -140,7 +172,31 @@ function scheduleReminders (client) {
       setTimeout(() => sendReminder(client, devoir, '7d'), r7 - now)
     }
     if (r1 > now) {
-      setTimeout(() => sendReminder(client, devoir, '1d'), r1 - now)
+      setTimeout(() => sendReminder(client, devoir, '1d-morning'), r1 - now)
+    }
+
+    const guildCfg = getGuildConfig(devoir.guildId || '')
+    const timings = [
+      ...(Array.isArray(guildCfg.customTimings) ? guildCfg.customTimings : []),
+      ...(Array.isArray(devoir.customTimings) ? devoir.customTimings : [])
+    ]
+
+    if (Array.isArray(timings)) {
+      for (const t of timings) {
+        if (!t || typeof t.offsetMs !== 'number') continue
+        const trigger = deadlineMs - t.offsetMs
+        if (trigger > now) {
+          setTimeout(
+            () =>
+              sendReminder(
+                client,
+                devoir,
+                `custom-${t.label || t.offsetMs.toString()}`
+              ),
+            trigger - now
+          )
+        }
+      }
     }
   }
 
@@ -184,6 +240,12 @@ module.exports = {
         .setDescription('Description')
         .setRequired(false)
         .setMaxLength(1000)
+    )
+    .addStringOption(option =>
+      option
+        .setName('timings')
+        .setDescription("Timings custom pour CE devoir (ex: '3j,12h,45m')")
+        .setRequired(false)
     ),
   emoji: '🧾',
 
@@ -192,6 +254,7 @@ module.exports = {
     const dateStr = interaction.options.getString('date', true)
     const type = interaction.options.getString('type', true)
     const description = interaction.options.getString('description') || ''
+    const timingsStr = interaction.options.getString('timings') || ''
 
     // Vérification de la date
     const deadline = new Date(dateStr)
@@ -203,6 +266,27 @@ module.exports = {
       })
     }
 
+    let perDevoirTimings = []
+    if (timingsStr.trim().length > 0) {
+      const parts = timingsStr
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean)
+      for (const p of parts) {
+        const off = parseOffset(p)
+        if (!off) {
+          return interaction.reply({
+            content: `❌ Timing invalide : \`${p}\` (ex attendus : 3j, 12h, 45m, 1h30).`,
+            flags: 64
+          })
+        }
+        perDevoirTimings.push({
+          label: p,
+          offsetMs: off
+        })
+      }
+    }
+
     const devoirs = readDevoirs()
     const newDevoir = {
       id: Date.now(),
@@ -211,7 +295,8 @@ module.exports = {
       titre,
       date: dateStr,
       description,
-      type
+      type,
+      customTimings: perDevoirTimings
     }
     devoirs.push(newDevoir)
     writeDevoirs(devoirs)
@@ -234,6 +319,13 @@ module.exports = {
         iconURL: interaction.client.user.displayAvatarURL()
       })
 
+    if (perDevoirTimings.length > 0) {
+      embed.addFields({
+        name: '⏱️ Timings personnalisés (pour ce devoir)',
+        value: perDevoirTimings.map(t => `• ${t.label}`).join('\n')
+      })
+    }
+
     await interaction.reply({
       embeds: [embed],
       flags: 64
@@ -241,6 +333,7 @@ module.exports = {
 
     // Programmation des rappels pour CE devoir uniquement (j'en ai marre de cette fonctionnalité 😭)
     const now = Date.now()
+    const deadlineMs = deadline.getTime()
 
     const d7 = new Date(deadline)
     d7.setDate(d7.getDate() - 7)
@@ -260,9 +353,33 @@ module.exports = {
     }
     if (r1 > now) {
       setTimeout(
-        () => sendReminder(interaction.client, newDevoir, '1d'),
+        () => sendReminder(interaction.client, newDevoir, '1d-morning'),
         r1 - now
       )
+    }
+
+    const guildCfg = getGuildConfig(newDevoir.guildId || '')
+    const timings = [
+      ...(Array.isArray(guildCfg.customTimings) ? guildCfg.customTimings : []),
+      ...perDevoirTimings
+    ]
+
+    if (Array.isArray(timings)) {
+      for (const t of timings) {
+        if (!t || typeof t.offsetMs !== 'number') continue
+        const trigger = deadlineMs - t.offsetMs
+        if (trigger > now) {
+          setTimeout(
+            () =>
+              sendReminder(
+                interaction.client,
+                newDevoir,
+                `custom-${t.label || t.offsetMs.toString()}`
+              ),
+            trigger - now
+          )
+        }
+      }
     }
   },
 
