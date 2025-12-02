@@ -4,6 +4,7 @@ const path = require('path')
 
 const DATA_FILE = path.join(__dirname, '../../data/devoirs.json')
 const CONFIG_FILE = path.join(__dirname, '../../data/devoirs-config.json')
+const ARCHIVE_FILE = path.join(__dirname, '../../data/devoirs-archives.json')
 
 // Lecture / écriture des devoirs
 function readDevoirs () {
@@ -30,6 +31,70 @@ function writeDevoirs (list) {
   } catch (e) {
     console.error('Erreur écriture devoirs.json :', e)
   }
+}
+
+// Lecture / écriture archive
+function readArchive () {
+  if (!fs.existsSync(ARCHIVE_FILE)) return []
+  try {
+    const data = JSON.parse(fs.readFileSync(ARCHIVE_FILE, 'utf-8'))
+    return Array.isArray(data) ? data : []
+  } catch (e) {
+    console.error('Erreur lecture devoirs-archives.json :', e)
+    return []
+  }
+}
+
+function writeArchive (list) {
+  try {
+    fs.writeFileSync(
+      ARCHIVE_FILE,
+      JSON.stringify(list, null, 2),
+      'utf-8'
+    )
+  } catch (e) {
+    console.error('Erreur écriture devoirs-archives.json :', e)
+  }
+}
+
+function movePastDevoirsToArchive () {
+  const now = new Date()
+  const todayMidnight = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime()
+
+  const current = readDevoirs()
+  const archived = readArchive()
+
+  const alreadyIds = new Set(archived.map(d => d.id))
+
+  const stillCurrent = []
+  const toArchive = []
+
+  for (const d of current) {
+    const dDate = new Date(d.date)
+    if (isNaN(dDate.getTime())) {
+      stillCurrent.push(d)
+      continue
+    }
+
+    if (dDate.getTime() < todayMidnight) {
+      if (!alreadyIds.has(d.id)) {
+        toArchive.push(d)
+      }
+    } else {
+      stillCurrent.push(d)
+    }
+  }
+
+  if (toArchive.length > 0) {
+    writeDevoirs(stillCurrent)
+    writeArchive([...archived, ...toArchive])
+  }
+
+  console.log(`${toArchive.length} devoir(s) archivé(s).`)
 }
 
 // Config des rôles de mention + timings serveur
@@ -149,6 +214,8 @@ async function sendReminder (client, devoir, kind) {
 
 // juste la fonction qui gère tous les rappels au démarrage
 function scheduleReminders (client) {
+  movePastDevoirsToArchive()
+
   const devoirs = readDevoirs()
   const now = Date.now()
 
@@ -265,6 +332,8 @@ module.exports = {
         flags: 64
       })
     }
+
+    movePastDevoirsToArchive()
 
     let perDevoirTimings = []
     if (timingsStr.trim().length > 0) {
