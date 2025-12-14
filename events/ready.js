@@ -1,4 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
+const { scheduleReminders } = require("../commands/utility/ajouter-devoir.js");
 const Parser = require('rss-parser');
 const fs = require('fs');
 const path = require('path');
@@ -26,6 +27,7 @@ module.exports = {
 
         // Démarrer le système de vérification RSS
         startRSSChecker(client);
+        scheduleReminders(client);
     },
 };
 
