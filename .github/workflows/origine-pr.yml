@@ -1,4 +1,4 @@
-name: Vérifier l’origine des PR
+name: Verifier l’origine des PR
 
 on:
   pull_request:
@@ -20,15 +20,10 @@ jobs:
             const base = context.payload.pull_request?.base?.ref || '';
             const head = context.payload.pull_request?.head?.ref || '';
 
-            if (base !== 'main') {
-              core.info(`La branche cible est '${base}', pas 'main' → aucune vérification.`);
-              return;
-            }
-
             const headLower = head.toLowerCase();
-            const ok = headLower === 'dev' || headLower.includes('hotfix');
+            const isAllowedSourceBranch = headLower === 'dev' || headLower.includes('hotfix');
 
-            if (ok) {
+            if (isAllowedSourceBranch) {
               return;
             }
 
