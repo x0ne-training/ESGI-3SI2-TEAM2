@@ -140,7 +140,7 @@ module.exports = {
                 if (buttonInteraction.user.id !== interaction.user.id) {
                     return buttonInteraction.reply({
                         content: '❌ Seul l\'utilisateur qui a lancé la commande peut confirmer.',
-                        ephemeral: true
+                        falgs: 64
                     });
                 }
 

@@ -17,7 +17,7 @@ module.exports = {
             if (!fs.existsSync(RSS_CONFIG_PATH)) {
                 return await interaction.reply({
                     content: 'Aucun flux RSS n\'est configuré sur ce serveur.\n\nUtilisez `/rss-setup` pour en configurer un.',
-                    ephemeral: true
+                    falgs: 64
                 });
             }
 
@@ -29,7 +29,7 @@ module.exports = {
             if (!guildFeeds || Object.keys(guildFeeds).length === 0) {
                 return await interaction.reply({
                     content: 'Aucun flux RSS n\'est configuré sur ce serveur.\n\nUtilisez `/rss-setup` pour en configurer un.',
-                    ephemeral: true
+                    falgs: 64
                 });
             }
 
@@ -65,7 +65,7 @@ module.exports = {
             console.error('Erreur lors de l\'affichage des flux RSS:', error);
             await interaction.reply({
                 content: 'Une erreur s\'est produite lors de l\'affichage des flux RSS.',
-                ephemeral: true
+                falgs: 64
             });
         }
     },

@@ -23,7 +23,7 @@ module.exports = {
         if (!interaction.member.permissions.has('Administrator')) {
             return await interaction.reply({
                 content: 'Vous devez être administrateur pour supprimer les flux RSS.',
-                ephemeral: true
+                falgs: 64
             });
         }
 
@@ -34,7 +34,7 @@ module.exports = {
             if (!fs.existsSync(RSS_CONFIG_PATH)) {
                 return await interaction.reply({
                     content: 'Aucun flux RSS n\'est configuré sur ce serveur.',
-                    ephemeral: true
+                    falgs: 64
                 });
             }
 
@@ -46,7 +46,7 @@ module.exports = {
             if (!guildFeeds || Object.keys(guildFeeds).length === 0) {
                 return await interaction.reply({
                     content: 'Aucun flux RSS n\'est configuré sur ce serveur.',
-                    ephemeral: true
+                    falgs: 64
                 });
             }
 
@@ -65,7 +65,7 @@ module.exports = {
             if (!feedToRemove) {
                 return await interaction.reply({
                     content: `Aucun flux RSS trouvé avec le nom "${feedName}".\n\nUtilisez \`/rss-list\` pour voir tous les flux configurés.`,
-                    ephemeral: true
+                    falgs: 64
                 });
             }
 
@@ -90,7 +90,7 @@ module.exports = {
             console.error('Erreur lors de la suppression RSS:', error);
             await interaction.reply({
                 content: 'Une erreur s\'est produite lors de la suppression du flux RSS.',
-                ephemeral: true
+                falgs: 64
             });
         }
     },

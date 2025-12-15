@@ -49,7 +49,7 @@ module.exports = {
       return interaction.reply({
         content:
           "Je ne peux envoyer des messages que dans un salon textuel du serveur.",
-        ephemeral: true,
+        falgs: 64,
       });
     }
 
@@ -59,7 +59,7 @@ module.exports = {
       return interaction.reply({
         content:
           "Je n’ai pas la permission d’envoyer des messages dans ce salon.",
-        ephemeral: true,
+        falgs: 64,
       });
     }
 
@@ -86,12 +86,12 @@ module.exports = {
         })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [confirm], ephemeral: true });
+      await interaction.reply({ embeds: [confirm], falgs: 64 });
     } catch (err) {
       console.error("Anonymous send error:", err);
       await interaction.reply({
         content: "Une erreur est survenue lors de l’envoi du message.",
-        ephemeral: true,
+        falgs: 64,
       });
     }
   },
