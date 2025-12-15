@@ -19,7 +19,12 @@ jobs:
       - name: Rechercher 'ephemeral: true' dans le code
         id: scan
         run: |
-          matches=$(grep -RIn "ephemeral: true" . || true)
+          matches=$(grep -RIn "ephemeral:[[:space:]]*true" . \
+            --exclude-dir=.git \
+            --exclude-dir=.github \
+            --exclude-dir=node_modules \
+            --include="*.js" \
+            --include="*.ts" || true)
 
           if [ -n "$matches" ]; then
             echo "found=true" >> $GITHUB_OUTPUT
