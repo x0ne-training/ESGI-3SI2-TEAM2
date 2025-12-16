@@ -107,4 +107,9 @@ Thumbs.db
 # Bot specific
 config.json
 bot-config.json
-sats.json
+stats.json
+rss-config.json
+events-config.json
+devoirs.json
+devoirs-config.json
+devoirs-archives.json

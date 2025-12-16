@@ -1,8 +1,17 @@
 const { Events } = require('discord.js');
+const { handleEventInteraction } = require('./eventInteractions');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
+
+        if (interaction.isAutocomplete()) {
+            const command = interaction.client.commands.get(interaction.commandName);
+            if (!command || !command.autocomplete) return;
+            await command.autocomplete(interaction);
+            return;
+        }
+
         // Gestion des commandes slash
         if (interaction.isChatInputCommand()) {
             const command = interaction.client.commands.get(interaction.commandName);
@@ -40,7 +49,9 @@ module.exports = {
         // Gestion des boutons (pour de futures fonctionnalités)
         else if (interaction.isButton()) {
             console.log(`🔘 ${interaction.user.tag} a cliqué sur le bouton: ${interaction.customId}`);
-            // Ajouter ici la logique pour les boutons
+            
+            // Gérer les interactions d'événements
+            await handleEventInteraction(interaction);
         }
         
         // Gestion des menus déroulants (pour de futures fonctionnalités)
