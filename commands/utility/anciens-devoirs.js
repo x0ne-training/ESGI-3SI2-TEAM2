@@ -10,6 +10,18 @@ const TYPE_LABELS = {
   examen: 'Examen'
 }
 
+const IMPORTANCE_LABELS = {
+  faible: 'Peu important',
+  important: 'Important',
+  tres_important: 'Très important'
+}
+
+const IMPORTANCE_EMOJIS = {
+  faible: '🟢',
+  important: '🟠',
+  tres_important: '🔴'
+}
+
 // Lecture / écriture devoirs actuels
 function readDevoirs () {
   if (!fs.existsSync(DATA_FILE)) return []
@@ -97,7 +109,7 @@ module.exports = {
     .setDescription(
       'Affiche les devoirs / examens dont la date est dépassée pour ce serveur.'
     )
-    .setDMPermission(false),
+    .setContexts(['Guild']),
   emoji: '📜',
 
   async execute (interaction) {
@@ -129,9 +141,15 @@ module.exports = {
     const desc = slice
       .map((d, i) => {
         const typeLabel = TYPE_LABELS[d.type] || 'Devoir'
+
+        const impKey = d.importance || 'important'
+        const impEmoji = IMPORTANCE_EMOJIS[impKey] || '🟠'
+        const impLabel = IMPORTANCE_LABELS[impKey] || 'Important'
+
         return (
           `**${i + 1}. ${d.titre}** (${typeLabel})\n` +
           `📅 ${d.date}\n` +
+          `📍 ${impEmoji} ${impLabel}\n` +
           (d.description ? `📝 ${d.description}\n` : '') +
           `\u200b`
         )
