@@ -144,7 +144,7 @@ module.exports = {
                     if (componentInteraction.user.id !== interaction.user.id) {
                         return componentInteraction.reply({
                             content: '❌ Seul l\'utilisateur qui a lancé la commande peut naviguer.',
-                            falgs: 64
+                            flags: 64
                         });
                     }
 
@@ -179,7 +179,7 @@ module.exports = {
                             const detailEmbed = createEventDetailEmbed(event, interaction.client);
                             await componentInteraction.reply({
                                 embeds: [detailEmbed],
-                                falgs: 64
+                                flags: 64
                             });
                         }
                     }
