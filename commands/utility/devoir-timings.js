@@ -34,6 +34,27 @@ function parseOffset (str) {
   return total > 0 ? total : null
 }
 
+// Affiche un délai lisible (mieux que les ms 💀)
+function formatDuration (ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '—'
+
+  const totalSeconds = Math.floor(ms / 1000)
+  const seconds = totalSeconds % 60
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  const minutes = totalMinutes % 60
+  const totalHours = Math.floor(totalMinutes / 60)
+  const hours = totalHours % 24
+  const days = Math.floor(totalHours / 24)
+
+  const parts = []
+  if (days) parts.push(`${days}j`)
+  if (hours) parts.push(`${hours}h`)
+  if (minutes) parts.push(`${minutes}m`)
+  if (seconds) parts.push(`${seconds}s`)
+  if (parts.length === 0) return '0s'
+  return parts.join(' ')
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('devoir-timings')
@@ -76,15 +97,15 @@ module.exports = {
   emoji: '⏱️',
 
   async execute (interaction) {
-    const guildId = interaction.guildId;
-    const cfg = readConfig();
+    const guildId = interaction.guildId
+    const cfg = readConfig()
 
     if (!cfg[guildId]) {
-        cfg[guildId] = { roleId: null, customTimings: [] };
+      cfg[guildId] = { roleId: null, customTimings: [] }
     }
 
     if (!Array.isArray(cfg[guildId].customTimings)) {
-        cfg[guildId].customTimings = [];
+      cfg[guildId].customTimings = []
     }
     const sub = interaction.options.getSubcommand()
 
@@ -123,7 +144,7 @@ module.exports = {
       }
 
       const desc = list
-        .map((t, i) => `**${i + 1}.** ${t.label} — ${t.offsetMs}ms`)
+        .map((t, i) => `**${i + 1}.** ${t.label} — ${formatDuration(t.offsetMs)}`)
         .join('\n')
 
       return interaction.reply({
