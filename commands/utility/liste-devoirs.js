@@ -25,19 +25,14 @@ function readDevoirs () {
 
 const TYPE_LABELS = {
   devoir: 'Devoir',
-  examen: 'Examen'
+  examen: 'Examen',
+  projet: 'Projet'
 }
 
 const IMPORTANCE_LABELS = {
   faible: 'Peu important',
   important: 'Important',
   tres_important: 'Très important'
-}
-
-const IMPORTANCE_EMOJIS = {
-  faible: '🟢',
-  important: '🟠',
-  tres_important: '🔴'
 }
 
 function importanceScore (imp) {
@@ -49,7 +44,7 @@ function importanceScore (imp) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('liste-devoirs')
-    .setDescription('Affiche la liste des devoirs / examens numérotés.')
+    .setDescription('Affiche la liste des devoirs / examens / projets numérotés.')
     .addStringOption(option =>
       option
         .setName('type')
@@ -57,7 +52,8 @@ module.exports = {
         .setRequired(false)
         .addChoices(
           { name: 'devoir', value: 'devoir' },
-          { name: 'examen', value: 'examen' }
+          { name: 'examen', value: 'examen' },
+          { name: 'projet', value: 'projet' }
         )
     ),
   emoji: '📚',
@@ -96,15 +92,12 @@ module.exports = {
       .map((d, i) => {
         const num = i + 1
         const typeLabel = TYPE_LABELS[d.type] || 'Devoir'
-
-        const impKey = d.importance || 'important'
-        const impEmoji = IMPORTANCE_EMOJIS[impKey] || '🟠'
-        const impLabel = IMPORTANCE_LABELS[impKey] || 'Important'
+        const impLabel = IMPORTANCE_LABELS[d.importance || 'important'] || 'Important'
 
         return (
           `**${num}. ${d.titre}** (${typeLabel})\n` +
           `📅 ${d.date}\n` +
-          `📍 ${impEmoji} ${impLabel}\n` +
+          `📍 ${impLabel}\n` +
           (d.description ? `📝 ${d.description}\n` : '') +
           `\u200b`
         )
@@ -112,8 +105,8 @@ module.exports = {
       .join('\n')
 
     const title = filterType
-        ? `📚 ${TYPE_LABELS[filterType]}s`
-        : '📚 Devoirs / Examens'
+      ? `📚 ${TYPE_LABELS[filterType]}s`
+      : '📚 Devoirs / Examens / Projets'
 
     const embed = new EmbedBuilder()
       .setColor(0x3498db)

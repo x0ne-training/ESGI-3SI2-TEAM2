@@ -27,19 +27,20 @@ function writeDevoirs (list) {
 
 const TYPE_LABELS = {
   devoir: 'Devoir',
-  examen: 'Examen'
+  examen: 'Examen',
+  projet: 'Projet'
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('modifier-date-devoir')
-    .setDescription('Modifie la date limite d’un devoir ou examen.')
+    .setDescription('Modifie la date limite d’un devoir, examen ou projet.')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setContexts(['Guild'])
     .addStringOption(option =>
       option
         .setName('devoir')
-        .setDescription('Choisis le devoir/examen à modifier')
+        .setDescription('Choisis le devoir/examen/projet à modifier')
         .setRequired(true)
         .setAutocomplete(true)
     )
@@ -77,7 +78,7 @@ module.exports = {
 
     if (index === -1) {
       return interaction.reply({
-        content: '❌ Aucun devoir/examen trouvé avec cet identifiant.',
+        content: '❌ Aucun devoir/examen/projet trouvé avec cet identifiant.',
         flags: 64
       })
     }
@@ -91,7 +92,7 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(0x3498db)
-      .setTitle('🗓️ Date de devoir modifiée')
+      .setTitle('🗓️ Date modifiée')
       .setDescription(
         `La date du ${typeLabel.toLowerCase()} **${
           devoirs[index].titre

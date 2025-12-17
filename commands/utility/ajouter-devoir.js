@@ -149,19 +149,14 @@ function parseOffset (str) {
 
 const TYPE_LABELS = {
   devoir: 'Devoir',
-  examen: 'Examen'
+  examen: 'Examen',
+  projet: 'Projet'
 }
 
 const IMPORTANCE_LABELS = {
   faible: 'Peu important',
   important: 'Important',
   tres_important: 'Très important'
-}
-
-const IMPORTANCE_EMOJIS = {
-  faible: '🟢',
-  important: '🟠',
-  tres_important: '🔴'
 }
 
 function getReminderColor (importance, kind) {
@@ -173,6 +168,7 @@ function getReminderColor (importance, kind) {
         ? 0x95a5a6
         : 0xf39c12
 
+  // J-7 un peu plus soft (sauf très important)
   if (kind === '7d' && imp !== 'tres_important') {
     color = 0xf1c40f
   }
@@ -190,10 +186,8 @@ async function sendReminder (client, devoir, kind) {
     if (!channel) return
 
     const typeLabel = TYPE_LABELS[devoir.type] || 'Devoir'
-
     const impKey = devoir.importance || 'important'
     const impLabel = IMPORTANCE_LABELS[impKey] || 'Important'
-    const impEmoji = IMPORTANCE_EMOJIS[impKey] || '🟠'
 
     let description
     if (kind === '7d') {
@@ -212,7 +206,7 @@ async function sendReminder (client, devoir, kind) {
 
     const embed = new EmbedBuilder()
       .setColor(getReminderColor(impKey, kind))
-      .setTitle(`${impEmoji} 📢 Rappel ${typeLabel}`)
+      .setTitle(`📢 Rappel ${typeLabel}`)
       .setDescription(description)
       .addFields(
         { name: '📘 Titre', value: devoir.titre },
@@ -310,7 +304,7 @@ function scheduleReminders (client) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ajouter-devoir')
-    .setDescription('Ajoute un devoir ou un examen avec rappels J-7 et J-1.')
+    .setDescription('Ajoute un devoir, un examen ou un projet avec rappels J-7 et J-1.')
     .addStringOption(option =>
       option
         .setName('titre')
@@ -327,11 +321,12 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('type')
-        .setDescription('Type : devoir ou examen')
+        .setDescription('Type : devoir, examen ou projet')
         .setRequired(true)
         .addChoices(
           { name: 'devoir', value: 'devoir' },
-          { name: 'examen', value: 'examen' }
+          { name: 'examen', value: 'examen' },
+          { name: 'projet', value: 'projet' }
         )
     )
     .addStringOption(option =>
@@ -418,15 +413,14 @@ module.exports = {
 
     const typeLabel = TYPE_LABELS[type] || 'Devoir'
     const impLabel = IMPORTANCE_LABELS[importance] || 'Important'
-    const impEmoji = IMPORTANCE_EMOJIS[importance] || '🟠'
 
     const embed = new EmbedBuilder()
-      .setColor(type === 'examen' ? 0x9b59b6 : 0x2ecc71)
+      .setColor(type === 'examen' ? 0x9b59b6 : type === 'projet' ? 0x3498db : 0x2ecc71)
       .setTitle(`✅ ${typeLabel} ajouté`)
       .addFields(
         { name: '📘 Titre', value: titre },
         { name: '🗂️ Type', value: typeLabel, inline: true },
-        { name: '📍 Importance', value: `${impEmoji} ${impLabel}`, inline: true },
+        { name: '📍 Importance', value: impLabel, inline: true },
         { name: '📅 Date limite', value: dateStr, inline: true },
         { name: '📝 Description', value: description || 'Aucune' },
         { name: '📢 Salon des rappels', value: `<#${interaction.channelId}>` }
