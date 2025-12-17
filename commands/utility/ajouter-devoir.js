@@ -48,11 +48,7 @@ function readArchive () {
 
 function writeArchive (list) {
   try {
-    fs.writeFileSync(
-      ARCHIVE_FILE,
-      JSON.stringify(list, null, 2),
-      'utf-8'
-    )
+    fs.writeFileSync(ARCHIVE_FILE, JSON.stringify(list, null, 2), 'utf-8')
   } catch (e) {
     console.error('Erreur écriture devoirs-archives.json :', e)
   }
@@ -123,6 +119,7 @@ function getGuildConfig (guildId) {
   const raw = cfg[guildId] || {}
   return {
     roleId: raw.roleId || null,
+    reminderChannelId: raw.reminderChannelId || null,
     customTimings: Array.isArray(raw.customTimings) ? raw.customTimings : []
   }
 }
@@ -162,11 +159,7 @@ const IMPORTANCE_LABELS = {
 function getReminderColor (importance, kind) {
   const imp = importance || 'important'
   let color =
-    imp === 'tres_important'
-      ? 0xe74c3c
-      : imp === 'faible'
-        ? 0x95a5a6
-        : 0xf39c12
+    imp === 'tres_important' ? 0xe74c3c : imp === 'faible' ? 0x95a5a6 : 0xf39c12
 
   // J-7 un peu plus soft (sauf très important)
   if (kind === '7d' && imp !== 'tres_important') {
@@ -178,10 +171,13 @@ function getReminderColor (importance, kind) {
 // Rappels
 async function sendReminder (client, devoir, kind) {
   try {
-    if (!devoir.channelId || !devoir.guildId) return
+    if (!devoir.guildId) return
+    const guildCfg = getGuildConfig(devoir.guildId)
+    const targetChannelId = guildCfg.reminderChannelId || devoir.channelId
+    if (!targetChannelId) return
 
     const channel = await client.channels
-      .fetch(devoir.channelId)
+      .fetch(targetChannelId)
       .catch(() => null)
     if (!channel) return
 
@@ -216,7 +212,6 @@ async function sendReminder (client, devoir, kind) {
       )
       .setTimestamp()
 
-    const guildCfg = getGuildConfig(devoir.guildId)
     let content = '@everyone'
     let allowedMentions = { parse: ['everyone'] }
 
@@ -300,7 +295,6 @@ function scheduleReminders (client) {
 }
 
 // Commande
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ajouter-devoir')
@@ -332,7 +326,7 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('importance')
-        .setDescription('Priorité : peu important / important / très important')
+        .setDescription('Importance : peu important / important / très important')
         .setRequired(false)
         .addChoices(
           { name: 'peu important', value: 'faible' },
