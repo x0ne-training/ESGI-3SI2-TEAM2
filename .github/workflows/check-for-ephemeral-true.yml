@@ -1,4 +1,4 @@
-name: Vérifier l'utilisation de 'ephemeral: true'
+name: "Verifier l'utilisation de 'ephemeral'"
 
 on:
   pull_request:
