@@ -1,0 +1,33 @@
+name: Verifier l’origine des PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  enforce-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifier la branche source via GitHub Script (sans shell)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const base = context.payload.pull_request?.base?.ref || '';
+            const head = context.payload.pull_request?.head?.ref || '';
+
+            const headLower = head.toLowerCase();
+            const isAllowedSourceBranch = headLower === 'dev' || headLower.includes('hotfix');
+
+            if (isAllowedSourceBranch) {
+              return;
+            }
+
+            core.setFailed(
+              "Pull Request non conforme : cette PR vise 'main' mais la branche source n'est ni 'dev' ni une branche contenant 'hotfix'.\n" +
+              "Ouvrez la PR depuis 'dev' OU renommez la branche pour inclure 'hotfix'."
+            );
