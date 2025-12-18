@@ -20,13 +20,13 @@ jobs:
         id: scan
         shell: bash
         run: |
-          matches=$(grep -RIn 
-          --exclude-dir=.git 
-          --exclude-dir=.github 
-          --exclude-dir=node_modules 
-          --include="*.js" 
-          --include="*.ts" 
-          "ephemeral:[[:space:]]*true" . || true)
+          matches=$(grep -RIn \
+            --exclude-dir=.git \
+            --exclude-dir=.github \
+            --exclude-dir=node_modules \
+            --include="*.js" \
+            --include="*.ts" \
+            "ephemeral:[[:space:]]*true" .) || true
 
           if [ -n "$matches" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
