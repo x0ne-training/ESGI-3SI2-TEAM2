@@ -1,0 +1,13 @@
+{
+  "events": {},
+  "reminders": {},
+  "settings": {
+    "defaultReminderTimes": [
+      {"value": 24, "unit": "hours", "label": "24h avant"},
+      {"value": 1, "unit": "hours", "label": "1h avant"},
+      {"value": 15, "unit": "minutes", "label": "15min avant"}
+    ],
+    "maxEventsPerGuild": 50,
+    "maxParticipantsPerEvent": 100
+  }
+}

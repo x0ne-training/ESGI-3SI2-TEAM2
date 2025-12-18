@@ -36,7 +36,7 @@ module.exports = {
         if (!interaction.member.permissions.has('Administrator')) {
             return await interaction.reply({
                 content: 'Vous devez être administrateur pour configurer les flux RSS.',
-                ephemeral: true
+                flags: 64
             });
         }
 
