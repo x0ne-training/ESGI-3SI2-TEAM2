@@ -7,7 +7,14 @@ const ARCHIVE_FILE = path.join(__dirname, '../../data/devoirs-archives.json')
 
 const TYPE_LABELS = {
   devoir: 'Devoir',
-  examen: 'Examen'
+  examen: 'Examen',
+  projet: 'Projet'
+}
+
+const IMPORTANCE_LABELS = {
+  faible: 'Peu important',
+  important: 'Important',
+  tres_important: 'Très important'
 }
 
 // Lecture / écriture devoirs actuels
@@ -95,9 +102,9 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('anciens-devoirs')
     .setDescription(
-      'Affiche les devoirs / examens dont la date est dépassée pour ce serveur.'
+      'Affiche les devoirs / examens / projets dont la date est dépassée pour ce serveur.'
     )
-    .setDMPermission(false),
+    .setContexts(['Guild']),
   emoji: '📜',
 
   async execute (interaction) {
@@ -111,7 +118,7 @@ module.exports = {
 
     if (archived.length === 0) {
       return interaction.reply({
-        content: '📭 Aucun ancien devoir/examen archivé pour ce serveur.',
+        content: '📭 Aucun ancien devoir/examen/projet archivé pour ce serveur.',
         flags: 64
       })
     }
@@ -129,9 +136,12 @@ module.exports = {
     const desc = slice
       .map((d, i) => {
         const typeLabel = TYPE_LABELS[d.type] || 'Devoir'
+        const impLabel = IMPORTANCE_LABELS[d.importance || 'important'] || 'Important'
+
         return (
           `**${i + 1}. ${d.titre}** (${typeLabel})\n` +
           `📅 ${d.date}\n` +
+          `📍 ${impLabel}\n` +
           (d.description ? `📝 ${d.description}\n` : '') +
           `\u200b`
         )
@@ -140,7 +150,7 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(0x95a5a6)
-      .setTitle('📜 Anciens devoirs / examens (archivés)')
+      .setTitle('📜 Anciens devoirs / examens / projets (archivés)')
       .setDescription(desc)
       .setFooter({
         text:

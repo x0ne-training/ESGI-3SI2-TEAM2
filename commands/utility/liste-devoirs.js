@@ -12,8 +12,10 @@ function readDevoirs () {
     if (!Array.isArray(data)) return []
     return data.map(d => ({
       type: 'devoir',
+      importance: 'important',
       ...d,
-      type: d.type || 'devoir' // anciens enregistrements -> "devoir"
+      type: d.type || 'devoir',
+      importance: d.importance || 'important'
     }))
   } catch (e) {
     console.error('Erreur lecture devoirs.json :', e)
@@ -23,13 +25,26 @@ function readDevoirs () {
 
 const TYPE_LABELS = {
   devoir: 'Devoir',
-  examen: 'Examen'
+  examen: 'Examen',
+  projet: 'Projet'
+}
+
+const IMPORTANCE_LABELS = {
+  faible: 'Peu important',
+  important: 'Important',
+  tres_important: 'Très important'
+}
+
+function importanceScore (imp) {
+  if (imp === 'tres_important') return 2
+  if (imp === 'important') return 1
+  return 0
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('liste-devoirs')
-    .setDescription('Affiche la liste des devoirs / examens numérotés.')
+    .setDescription('Affiche la liste des devoirs / examens / projets numérotés.')
     .addStringOption(option =>
       option
         .setName('type')
@@ -37,7 +52,8 @@ module.exports = {
         .setRequired(false)
         .addChoices(
           { name: 'devoir', value: 'devoir' },
-          { name: 'examen', value: 'examen' }
+          { name: 'examen', value: 'examen' },
+          { name: 'projet', value: 'projet' }
         )
     ),
   emoji: '📚',
@@ -57,8 +73,12 @@ module.exports = {
       })
     }
 
-    // Tri par date
+    // Tri: importance desc puis date asc
     devoirs.sort((a, b) => {
+      const ia = importanceScore(a.importance)
+      const ib = importanceScore(b.importance)
+      if (ia !== ib) return ib - ia
+
       const da = new Date(a.date)
       const db = new Date(b.date)
       if (isNaN(da) || isNaN(db)) return 0
@@ -72,9 +92,12 @@ module.exports = {
       .map((d, i) => {
         const num = i + 1
         const typeLabel = TYPE_LABELS[d.type] || 'Devoir'
+        const impLabel = IMPORTANCE_LABELS[d.importance || 'important'] || 'Important'
+
         return (
           `**${num}. ${d.titre}** (${typeLabel})\n` +
           `📅 ${d.date}\n` +
+          `📍 ${impLabel}\n` +
           (d.description ? `📝 ${d.description}\n` : '') +
           `\u200b`
         )
@@ -82,8 +105,8 @@ module.exports = {
       .join('\n')
 
     const title = filterType
-        ? `📚 ${TYPE_LABELS[filterType]}s`
-        : '📚 Devoirs / Examens'
+      ? `📚 ${TYPE_LABELS[filterType]}s`
+      : '📚 Devoirs / Examens / Projets'
 
     const embed = new EmbedBuilder()
       .setColor(0x3498db)
@@ -99,7 +122,7 @@ module.exports = {
 
     await interaction.reply({
       embeds: [embed],
-      flags : 64 // j'adore le fait que j'ai corrigé l'autre programme en remplaçant embed par flags mais que j'ai fait la même erreur sans m'en rendre compte juste après 💀
+      flags: 64
     })
   }
 }

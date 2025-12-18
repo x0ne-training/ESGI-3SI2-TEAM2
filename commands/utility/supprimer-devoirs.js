@@ -28,11 +28,11 @@ function writeDevoirs (list) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('supprimer-devoir')
-    .setDescription('Supprime un devoir ou un examen via une liste.')
+    .setDescription('Supprime un devoir, examen ou projet via une liste.')
     .addStringOption(option =>
       option
         .setName('devoir')
-        .setDescription('Choisis le devoir/examen à supprimer')
+        .setDescription('Choisis le devoir/examen/projet à supprimer')
         .setRequired(true)
         .setAutocomplete(true)
     ),
@@ -54,7 +54,7 @@ module.exports = {
 
     if (!target) {
       return interaction.reply({
-        content: '❌ Aucun devoir/examen trouvé avec cette valeur.',
+        content: '❌ Aucun devoir/examen/projet trouvé avec cette valeur.',
         flags: 64
       })
     }
@@ -103,7 +103,7 @@ module.exports = {
 
     const choices = filtered.slice(0, 25).map((d, index) => {
       const labelIndex = index + 1
-      const typeLabel = d.type === 'examen' ? 'Examen' : 'Devoir'
+      const typeLabel = d.type === 'examen' ? 'Examen' : d.type === 'projet' ? 'Projet' : 'Devoir'
       return {
         name: `${labelIndex}. [${typeLabel}] ${d.titre} – ${d.date}`,
         value: String(d.id)

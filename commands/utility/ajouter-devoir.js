@@ -14,6 +14,7 @@ function readDevoirs () {
     if (!Array.isArray(data)) return []
     return data.map(d => ({
       type: d.type || 'devoir',
+      importance: d.importance || 'important',
       guildId: d.guildId || null,
       channelId: d.channelId || null,
       customTimings: Array.isArray(d.customTimings) ? d.customTimings : [],
@@ -47,11 +48,7 @@ function readArchive () {
 
 function writeArchive (list) {
   try {
-    fs.writeFileSync(
-      ARCHIVE_FILE,
-      JSON.stringify(list, null, 2),
-      'utf-8'
-    )
+    fs.writeFileSync(ARCHIVE_FILE, JSON.stringify(list, null, 2), 'utf-8')
   } catch (e) {
     console.error('Erreur écriture devoirs-archives.json :', e)
   }
@@ -122,6 +119,7 @@ function getGuildConfig (guildId) {
   const raw = cfg[guildId] || {}
   return {
     roleId: raw.roleId || null,
+    reminderChannelId: raw.reminderChannelId || null,
     customTimings: Array.isArray(raw.customTimings) ? raw.customTimings : []
   }
 }
@@ -148,20 +146,44 @@ function parseOffset (str) {
 
 const TYPE_LABELS = {
   devoir: 'Devoir',
-  examen: 'Examen'
+  examen: 'Examen',
+  projet: 'Projet'
+}
+
+const IMPORTANCE_LABELS = {
+  faible: 'Peu important',
+  important: 'Important',
+  tres_important: 'Très important'
+}
+
+function getReminderColor (importance, kind) {
+  const imp = importance || 'important'
+  let color =
+    imp === 'tres_important' ? 0xe74c3c : imp === 'faible' ? 0x95a5a6 : 0xf39c12
+
+  // J-7 un peu plus soft (sauf très important)
+  if (kind === '7d' && imp !== 'tres_important') {
+    color = 0xf1c40f
+  }
+  return color
 }
 
 // Rappels
 async function sendReminder (client, devoir, kind) {
   try {
-    if (!devoir.channelId || !devoir.guildId) return
+    if (!devoir.guildId) return
+    const guildCfg = getGuildConfig(devoir.guildId)
+    const targetChannelId = guildCfg.reminderChannelId || devoir.channelId
+    if (!targetChannelId) return
 
     const channel = await client.channels
-      .fetch(devoir.channelId)
+      .fetch(targetChannelId)
       .catch(() => null)
     if (!channel) return
 
     const typeLabel = TYPE_LABELS[devoir.type] || 'Devoir'
+    const impKey = devoir.importance || 'important'
+    const impLabel = IMPORTANCE_LABELS[impKey] || 'Important'
 
     let description
     if (kind === '7d') {
@@ -179,17 +201,17 @@ async function sendReminder (client, devoir, kind) {
     }
 
     const embed = new EmbedBuilder()
-      .setColor(kind === '7d' ? 0xf1c40f : 0xe74c3c)
+      .setColor(getReminderColor(impKey, kind))
       .setTitle(`📢 Rappel ${typeLabel}`)
       .setDescription(description)
       .addFields(
         { name: '📘 Titre', value: devoir.titre },
         { name: '📅 Date limite', value: devoir.date },
+        { name: '📍 Importance', value: impLabel, inline: true },
         { name: '📝 Description', value: devoir.description || 'Aucune' }
       )
       .setTimestamp()
 
-    const guildCfg = getGuildConfig(devoir.guildId)
     let content = '@everyone'
     let allowedMentions = { parse: ['everyone'] }
 
@@ -273,11 +295,10 @@ function scheduleReminders (client) {
 }
 
 // Commande
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ajouter-devoir')
-    .setDescription('Ajoute un devoir ou un examen avec rappels J-7 et J-1.')
+    .setDescription('Ajoute un devoir, un examen ou un projet avec rappels J-7 et J-1.')
     .addStringOption(option =>
       option
         .setName('titre')
@@ -294,11 +315,23 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('type')
-        .setDescription('Type : devoir ou examen')
+        .setDescription('Type : devoir, examen ou projet')
         .setRequired(true)
         .addChoices(
           { name: 'devoir', value: 'devoir' },
-          { name: 'examen', value: 'examen' }
+          { name: 'examen', value: 'examen' },
+          { name: 'projet', value: 'projet' }
+        )
+    )
+    .addStringOption(option =>
+      option
+        .setName('importance')
+        .setDescription('Importance : peu important / important / très important')
+        .setRequired(false)
+        .addChoices(
+          { name: 'peu important', value: 'faible' },
+          { name: 'important', value: 'important' },
+          { name: 'très important', value: 'tres_important' }
         )
     )
     .addStringOption(option =>
@@ -320,6 +353,7 @@ module.exports = {
     const titre = interaction.options.getString('titre', true)
     const dateStr = interaction.options.getString('date', true)
     const type = interaction.options.getString('type', true)
+    const importance = interaction.options.getString('importance') || 'important'
     const description = interaction.options.getString('description') || ''
     const timingsStr = interaction.options.getString('timings') || ''
 
@@ -365,19 +399,22 @@ module.exports = {
       date: dateStr,
       description,
       type,
+      importance,
       customTimings: perDevoirTimings
     }
     devoirs.push(newDevoir)
     writeDevoirs(devoirs)
 
     const typeLabel = TYPE_LABELS[type] || 'Devoir'
+    const impLabel = IMPORTANCE_LABELS[importance] || 'Important'
 
     const embed = new EmbedBuilder()
-      .setColor(type === 'examen' ? 0x9b59b6 : 0x2ecc71)
+      .setColor(type === 'examen' ? 0x9b59b6 : type === 'projet' ? 0x3498db : 0x2ecc71)
       .setTitle(`✅ ${typeLabel} ajouté`)
       .addFields(
         { name: '📘 Titre', value: titre },
         { name: '🗂️ Type', value: typeLabel, inline: true },
+        { name: '📍 Importance', value: impLabel, inline: true },
         { name: '📅 Date limite', value: dateStr, inline: true },
         { name: '📝 Description', value: description || 'Aucune' },
         { name: '📢 Salon des rappels', value: `<#${interaction.channelId}>` }
