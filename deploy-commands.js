@@ -1,57 +1,49 @@
-const { REST, Routes } = require('discord.js');
+require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
-require('dotenv').config();
+const { REST, Routes } = require('discord.js');
 
-const commands = [];
+const COMMANDS_DIR = path.join(__dirname, 'commands');
 
-// Récupérer tous les fichiers de commandes
-const foldersPath = path.join(__dirname, 'commands');
-if (fs.existsSync(foldersPath)) {
-    const commandFolders = fs.readdirSync(foldersPath);
-
-    for (const folder of commandFolders) {
-        const commandsPath = path.join(foldersPath, folder);
-        const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-        
-        for (const file of commandFiles) {
-            const filePath = path.join(commandsPath, file);
-            const command = require(filePath);
-            
-            if ('data' in command && 'execute' in command) {
-                commands.push(command.data.toJSON());
-                console.log(`✅ Commande ajoutée pour le déploiement: ${command.data.name}`);
-            } else {
-                console.log(`⚠️ La commande ${filePath} manque une propriété "data" ou "execute" requise.`);
-            }
-        }
-    }
+function listJsRec(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files = [];
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) files.push(...listJsRec(full));
+    else if (e.isFile() && e.name.endsWith('.js')) files.push(full);
+  }
+  return files;
 }
 
-// Construire et préparer une instance de l'API REST
-const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+const commands = [];
+for (const file of listJsRec(COMMANDS_DIR)) {
+  const cmd = require(file);
+  if (cmd?.data?.toJSON) {
+    console.log(`✅ Commande ajoutée pour le déploiement: ${cmd.data.name}`);
+    commands.push(cmd.data.toJSON());
+  }
+}
 
-// Déployer les commandes
+const TOKEN = process.env.TOKEN || process.env.DISCORD_TOKEN;
+const { CLIENT_ID, GUILD_ID } = process.env;
+if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
+  console.error('❌ Env manquant: TOKEN/DISCORD_TOKEN, CLIENT_ID, GUILD_ID');
+  process.exit(1);
+}
+
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+
 (async () => {
-    try {
-        console.log(`🚀 Début du déploiement de ${commands.length} commande(s) slash.`);
-
-        // Déployer les commandes sur le serveur spécifique (plus rapide pour le développement)
-        if (process.env.GUILD_ID) {
-            const data = await rest.put(
-                Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-                { body: commands },
-            );
-            console.log(`✅ ${data.length} commande(s) slash déployée(s) sur le serveur de développement.`);
-        } else {
-            // Déployer globalement (prend jusqu'à 1 heure pour être visible)
-            const data = await rest.put(
-                Routes.applicationCommands(process.env.CLIENT_ID),
-                { body: commands },
-            );
-            console.log(`✅ ${data.length} commande(s) slash déployée(s) globalement.`);
-        }
-    } catch (error) {
-        console.error('❌ Erreur lors du déploiement des commandes:', error);
-    }
+  try {
+    console.log(`🚀 Déploiement de ${commands.length} commande(s) sur ${GUILD_ID}`);
+    await rest.put(
+      Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+      { body: commands }
+    );
+    console.log('✅ Déploiement terminé');
+  } catch (err) {
+    console.error('❌ Erreur déploiement:', err);
+  }
 })();
