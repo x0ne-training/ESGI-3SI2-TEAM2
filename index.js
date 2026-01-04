@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ReminderSystem = require('./events/reminderSystem');
 const RecurringEventsManager = require('./events/recurringEvents');
+const { initDevoirBoard } = require('./events/devoir-board')
 require('dotenv').config();
 
 // Créer une nouvelle instance client
@@ -83,6 +84,7 @@ client.once(Events.ClientReady, readyClient => {
     client.recurringEventsManager = recurringEventsManager;
 
     scheduleReminders(client);
+    initDevoirBoard(client)
 });
 
 // Gestion des erreurs
