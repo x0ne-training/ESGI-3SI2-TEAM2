@@ -1,8 +1,8 @@
 // events/ready.js
 const { Events } = require('discord.js');
-const ReminderSystem = require('../services/reminderSystem');
-const RecurringEventsManager = require('../services/recurringEvents');
 const { scheduleReminders } = require('../commands/utility/ajouter-devoir.js');
+const { startRemindersRunner } = require('../services/remindersRunner');
+const { initDevoirBoard } = require('../services/devoir-board');
 
 module.exports = {
   name: Events.ClientReady,
@@ -13,11 +13,12 @@ module.exports = {
 
     client.user.setActivity('3SIB Server', { type: 3 }); // WATCHING
 
-    // Init systèmes
-    client.reminderSystem = new ReminderSystem(client);
-    client.recurringEventsManager = new RecurringEventsManager(client);
-
-    // Relance des rappels persistés
+    // Rebuild reminders depuis devoirs.json -> reminders.json
     scheduleReminders(client);
+
+    // Runner persistant (salons + DM)
+    startRemindersRunner(client, { intervalMs: 30_000 });
+
+    initDevoirBoard(client);
   },
 };
