@@ -101,7 +101,7 @@ module.exports = {
         if (!interaction.member.permissions.has('ManageEvents') && !interaction.member.permissions.has('Administrator')) {
             return await interaction.reply({
                 content: '❌ Vous devez avoir la permission "Gérer les événements" pour créer un événement.',
-                ephemeral: true
+                flags: 64
             });
         }
 

@@ -57,7 +57,7 @@ async function handleEventInteraction(interaction) {
         if (!event) {
             return await interaction.reply({
                 content: '❌ Cet événement n\'existe plus ou a été supprimé.',
-                ephemeral: true
+                flags: 64
             });
         }
 
@@ -68,7 +68,7 @@ async function handleEventInteraction(interaction) {
         if (eventDate <= now && action !== 'info') {
             return await interaction.reply({
                 content: '❌ Cet événement est déjà passé, vous ne pouvez plus modifier votre participation.',
-                ephemeral: true
+                flags: 64
             });
         }
 
@@ -91,7 +91,7 @@ async function handleEventInteraction(interaction) {
         console.error('Erreur lors du traitement de l\'interaction d\'événement:', error);
         await interaction.reply({
             content: '❌ Une erreur est survenue lors du traitement de votre demande.',
-            ephemeral: true
+            flags: 64
         });
     }
 }
@@ -106,7 +106,7 @@ async function handleAttendEvent(interaction, event, eventsConfig) {
     if (event.participants.attending.includes(userId)) {
         return await interaction.reply({
             content: '✅ Vous participez déjà à cet événement!',
-            ephemeral: true
+            flags: 64
         });
     }
 
@@ -114,7 +114,7 @@ async function handleAttendEvent(interaction, event, eventsConfig) {
     if (event.participants.attending.length >= event.maxParticipants) {
         return await interaction.reply({
             content: `❌ Cet événement est complet (${event.maxParticipants}/${event.maxParticipants} participants).`,
-            ephemeral: true
+            flags: 64
         });
     }
 
@@ -134,7 +134,7 @@ async function handleAttendEvent(interaction, event, eventsConfig) {
     // Confirmer à l'utilisateur
     await interaction.reply({
         content: `✅ Parfait! Vous participez maintenant à **${event.title}**.`,
-        ephemeral: true
+        flags: 64
     });
 
     // Notifier le créateur si c'est le premier participant
@@ -153,7 +153,7 @@ async function handleMaybeEvent(interaction, event, eventsConfig) {
     if (event.participants.maybe.includes(userId)) {
         return await interaction.reply({
             content: '❓ Vous êtes déjà marqué comme "peut-être" pour cet événement!',
-            ephemeral: true
+            flags: 64
         });
     }
 
@@ -173,7 +173,7 @@ async function handleMaybeEvent(interaction, event, eventsConfig) {
     // Confirmer à l'utilisateur
     await interaction.reply({
         content: `❓ Noté! Vous êtes marqué comme "peut-être" pour **${event.title}**.`,
-        ephemeral: true
+        flags: 64
     });
 }
 
@@ -187,7 +187,7 @@ async function handleDeclineEvent(interaction, event, eventsConfig) {
     if (event.participants.notAttending.includes(userId)) {
         return await interaction.reply({
             content: '❌ Vous avez déjà décliné cet événement!',
-            ephemeral: true
+            flags: 64
         });
     }
 
@@ -207,7 +207,7 @@ async function handleDeclineEvent(interaction, event, eventsConfig) {
     // Confirmer à l'utilisateur
     await interaction.reply({
         content: `❌ Compris! Vous ne participez pas à **${event.title}**.`,
-        ephemeral: true
+        flags: 64
     });
 }
 
@@ -298,7 +298,7 @@ async function handleEventInfo(interaction, event) {
 
     await interaction.reply({
         embeds: [embed],
-        ephemeral: true
+        flags: 64
     });
 }
 

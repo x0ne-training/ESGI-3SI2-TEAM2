@@ -1,0 +1,53 @@
+name: "Vérifier l'utilisation de ephemeral: true"
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check-ephemeral:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: "Rechercher 'ephemeral: true' dans le code"
+        id: scan
+        shell: bash
+        run: |
+          matches=$(grep -RIn \
+            --exclude-dir=.git \
+            --exclude-dir=.github \
+            --exclude-dir=node_modules \
+            --include="*.js" \
+            --include="*.ts" \
+            "ephemeral:[[:space:]]*true" .) || true
+
+          if [ -n "$matches" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "matches<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$matches" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Échouer si 'ephemeral: true' est trouvé"
+        if: steps.scan.outputs.found == 'true'
+        run: |
+          echo "❌ L'utilisation de 'ephemeral: true' est interdite."
+          echo "➡️ Remplacez par : flags: 64"
+          echo ""
+          echo "Occurrences trouvées :"
+          echo "${{ steps.scan.outputs.matches }}"
+          exit 1
+
+      - name: "Succès si aucun 'ephemeral: true' n'est trouvé"
+        if: steps.scan.outputs.found == 'false'
+        run: |
+          echo "✅ Aucune utilisation de 'ephemeral: true' trouvée."
