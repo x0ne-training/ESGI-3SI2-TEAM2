@@ -1,6 +1,9 @@
+// commands/utility/ajouter-devoir.js
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js')
 const fs = require('fs')
 const path = require('path')
+
+const { addMany, cancelByDevoirId } = require('../../services/remindersStore')
 
 const DATA_FILE = path.join(__dirname, '../../data/devoirs.json')
 const CONFIG_FILE = path.join(__dirname, '../../data/devoirs-config.json')
@@ -106,14 +109,6 @@ function readConfig () {
   }
 }
 
-function writeConfig (cfg) {
-  try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf-8')
-  } catch (e) {
-    console.error('Erreur écriture devoirs-config.json :', e)
-  }
-}
-
 function getGuildConfig (guildId) {
   const cfg = readConfig()
   const raw = cfg[guildId] || {}
@@ -156,141 +151,105 @@ const IMPORTANCE_LABELS = {
   tres_important: 'Très important'
 }
 
-function getReminderColor (importance, kind) {
-  const imp = importance || 'important'
-  let color =
-    imp === 'tres_important' ? 0xe74c3c : imp === 'faible' ? 0x95a5a6 : 0xf39c12
+// Génère les reminders pour un devoir, sous forme d’objets JSON persistants
+function buildRemindersForDevoir (devoir) {
+  const now = Date.now()
+  const deadline = new Date(devoir.date)
+  if (isNaN(deadline.getTime())) return []
 
-  // J-7 un peu plus soft (sauf très important)
-  if (kind === '7d' && imp !== 'tres_important') {
-    color = 0xf1c40f
-  }
-  return color
-}
+  const deadlineMs = deadline.getTime()
 
-// Rappels
-async function sendReminder (client, devoir, kind) {
-  try {
-    if (!devoir.guildId) return
-    const guildCfg = getGuildConfig(devoir.guildId)
-    const targetChannelId = guildCfg.reminderChannelId || devoir.channelId
-    if (!targetChannelId) return
+  const guildCfg = getGuildConfig(devoir.guildId || '')
+  const sourceChannelId = devoir.channelId
+  if (!sourceChannelId) return []
 
-    const channel = await client.channels
-      .fetch(targetChannelId)
-      .catch(() => null)
-    if (!channel) return
+  const reminders = []
 
-    const typeLabel = TYPE_LABELS[devoir.type] || 'Devoir'
-    const impKey = devoir.importance || 'important'
-    const impLabel = IMPORTANCE_LABELS[impKey] || 'Important'
-
-    let description
-    if (kind === '7d') {
-      description = `Le ${typeLabel.toLowerCase()} **${
-        devoir.titre
-      }** est à rendre dans **7 jours** (le ${devoir.date}).`
-    } else if (kind === '1d-morning' || kind === '1d-evening') {
-      description = `Le ${typeLabel.toLowerCase()} **${
-        devoir.titre
-      }** est à rendre **demain** (${devoir.date}).`
-    } else {
-      description = `Rappel pour le ${typeLabel.toLowerCase()} **${
-        devoir.titre
-      }** (échéance le ${devoir.date}).`
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor(getReminderColor(impKey, kind))
-      .setTitle(`📢 Rappel ${typeLabel}`)
-      .setDescription(description)
-      .addFields(
-        { name: '📘 Titre', value: devoir.titre },
-        { name: '📅 Date limite', value: devoir.date },
-        { name: '📍 Importance', value: impLabel, inline: true },
-        { name: '📝 Description', value: devoir.description || 'Aucune' }
-      )
-      .setTimestamp()
-
-    let content = '@everyone'
-    let allowedMentions = { parse: ['everyone'] }
-
-    if (guildCfg.roleId) {
-      content = `<@&${guildCfg.roleId}>`
-      allowedMentions = { roles: [guildCfg.roleId] }
-    }
-
-    await channel.send({
-      content,
-      embeds: [embed],
-      allowedMentions
+  // J-7 à 08:00
+  const d7 = new Date(deadline)
+  d7.setDate(d7.getDate() - 7)
+  d7.setHours(8, 0, 0, 0)
+  if (d7.getTime() > now) {
+    reminders.push({
+      guildId: devoir.guildId,
+      sourceChannelId,
+      devoirId: devoir.id,
+      kind: '7d',
+      title: devoir.titre,
+      type: devoir.type,
+      importance: devoir.importance,
+      date: devoir.date,
+      description: devoir.description || '',
+      remindAtISO: d7.toISOString()
     })
-
-    console.log(
-      `Rappel (${kind}) envoyé pour ${devoir.titre} dans #${channel.id}`
-    )
-  } catch (err) {
-    console.error('Erreur lors de l’envoi d’un rappel :', err)
   }
+
+  // J-1 à 08:00
+  const d1 = new Date(deadline)
+  d1.setDate(d1.getDate() - 1)
+  d1.setHours(8, 0, 0, 0)
+  if (d1.getTime() > now) {
+    reminders.push({
+      guildId: devoir.guildId,
+      sourceChannelId,
+      devoirId: devoir.id,
+      kind: '1d-morning',
+      title: devoir.titre,
+      type: devoir.type,
+      importance: devoir.importance,
+      date: devoir.date,
+      description: devoir.description || '',
+      remindAtISO: d1.toISOString()
+    })
+  }
+
+  // Timings custom (serveur + devoir)
+  const timings = [
+    ...(Array.isArray(guildCfg.customTimings) ? guildCfg.customTimings : []),
+    ...(Array.isArray(devoir.customTimings) ? devoir.customTimings : [])
+  ]
+
+  for (const t of timings) {
+    if (!t || typeof t.offsetMs !== 'number') continue
+    const trigger = deadlineMs - t.offsetMs
+    if (trigger <= now) continue
+
+    reminders.push({
+      guildId: devoir.guildId,
+      sourceChannelId,
+      devoirId: devoir.id,
+      kind: `custom-${t.label || t.offsetMs.toString()}`,
+      title: devoir.titre,
+      type: devoir.type,
+      importance: devoir.importance,
+      date: devoir.date,
+      description: devoir.description || '',
+      remindAtISO: new Date(trigger).toISOString()
+    })
+  }
+
+  return reminders
 }
 
-// juste la fonction qui gère tous les rappels au démarrage
+// remplace l’ancien scheduleReminders (setTimeout) par “rebuild reminders” (JSON)
 function scheduleReminders (client) {
   movePastDevoirsToArchive()
 
   const devoirs = readDevoirs()
-  const now = Date.now()
+  let createdCount = 0
 
   for (const devoir of devoirs) {
-    const deadline = new Date(devoir.date)
-    if (isNaN(deadline)) continue
-
-    const deadlineMs = deadline.getTime()
-
-    const d7 = new Date(deadline)
-    d7.setDate(d7.getDate() - 7)
-    d7.setHours(8, 0, 0, 0)
-    const r7 = d7.getTime()
-
-    const d1 = new Date(deadline)
-    d1.setDate(d1.getDate() - 1)
-    d1.setHours(8, 0, 0, 0)
-    const r1 = d1.getTime()
-
-    if (r7 > now) {
-      setTimeout(() => sendReminder(client, devoir, '7d'), r7 - now)
-    }
-    if (r1 > now) {
-      setTimeout(() => sendReminder(client, devoir, '1d-morning'), r1 - now)
-    }
-
-    const guildCfg = getGuildConfig(devoir.guildId || '')
-    const timings = [
-      ...(Array.isArray(guildCfg.customTimings) ? guildCfg.customTimings : []),
-      ...(Array.isArray(devoir.customTimings) ? devoir.customTimings : [])
-    ]
-
-    if (Array.isArray(timings)) {
-      for (const t of timings) {
-        if (!t || typeof t.offsetMs !== 'number') continue
-        const trigger = deadlineMs - t.offsetMs
-        if (trigger > now) {
-          setTimeout(
-            () =>
-              sendReminder(
-                client,
-                devoir,
-                `custom-${t.label || t.offsetMs.toString()}`
-              ),
-            trigger - now
-          )
-        }
-      }
+    // on annule les pending existants de ce devoir, puis on recrée
+    cancelByDevoirId(devoir.id)
+    const reminders = buildRemindersForDevoir(devoir)
+    if (reminders.length > 0) {
+      addMany(reminders)
+      createdCount += reminders.length
     }
   }
 
   console.log(
-    `Programmation des rappels terminée pour ${devoirs.length} éléments.`
+    `✅ Reminders JSON rebuild: ${createdCount} rappel(s) pending créé(s) pour ${devoirs.length} élément(s).`
   )
 }
 
@@ -298,7 +257,9 @@ function scheduleReminders (client) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ajouter-devoir')
-    .setDescription('Ajoute un devoir, un examen ou un projet avec rappels J-7 et J-1.')
+    .setDescription(
+      'Ajoute un devoir, un examen ou un projet avec rappels J-7 et J-1.'
+    )
     .addStringOption(option =>
       option
         .setName('titre')
@@ -326,7 +287,9 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('importance')
-        .setDescription('Importance : peu important / important / très important')
+        .setDescription(
+          'Importance : peu important / important / très important'
+        )
         .setRequired(false)
         .addChoices(
           { name: 'peu important', value: 'faible' },
@@ -353,7 +316,8 @@ module.exports = {
     const titre = interaction.options.getString('titre', true)
     const dateStr = interaction.options.getString('date', true)
     const type = interaction.options.getString('type', true)
-    const importance = interaction.options.getString('importance') || 'important'
+    const importance =
+      interaction.options.getString('importance') || 'important'
     const description = interaction.options.getString('description') || ''
     const timingsStr = interaction.options.getString('timings') || ''
 
@@ -383,10 +347,7 @@ module.exports = {
             flags: 64
           })
         }
-        perDevoirTimings.push({
-          label: p,
-          offsetMs: off
-        })
+        perDevoirTimings.push({ label: p, offsetMs: off })
       }
     }
 
@@ -405,11 +366,18 @@ module.exports = {
     devoirs.push(newDevoir)
     writeDevoirs(devoirs)
 
+    // Création des rappels persistants (JSON), pas de setTimeout
+    cancelByDevoirId(newDevoir.id)
+    const remindersToCreate = buildRemindersForDevoir(newDevoir)
+    if (remindersToCreate.length > 0) addMany(remindersToCreate)
+
     const typeLabel = TYPE_LABELS[type] || 'Devoir'
     const impLabel = IMPORTANCE_LABELS[importance] || 'Important'
 
     const embed = new EmbedBuilder()
-      .setColor(type === 'examen' ? 0x9b59b6 : type === 'projet' ? 0x3498db : 0x2ecc71)
+      .setColor(
+        type === 'examen' ? 0x9b59b6 : type === 'projet' ? 0x3498db : 0x2ecc71
+      )
       .setTitle(`✅ ${typeLabel} ajouté`)
       .addFields(
         { name: '📘 Titre', value: titre },
@@ -432,61 +400,22 @@ module.exports = {
       })
     }
 
+    if (remindersToCreate.length > 0) {
+      embed.addFields({
+        name: '🔔 Rappels programmés (persistants)',
+        value: remindersToCreate
+          .map(
+            r =>
+              `• ${r.kind} → ${new Date(r.remindAtISO).toLocaleString('fr-FR')}`
+          )
+          .join('\n')
+      })
+    }
+
     await interaction.reply({
       embeds: [embed],
       flags: 64
     })
-
-    // Programmation des rappels pour CE devoir uniquement (j'en ai marre de cette fonctionnalité 😭)
-    const now = Date.now()
-    const deadlineMs = deadline.getTime()
-
-    const d7 = new Date(deadline)
-    d7.setDate(d7.getDate() - 7)
-    d7.setHours(8, 0, 0, 0)
-    const r7 = d7.getTime()
-
-    const d1 = new Date(deadline)
-    d1.setDate(d1.getDate() - 1)
-    d1.setHours(8, 0, 0, 0)
-    const r1 = d1.getTime()
-
-    if (r7 > now) {
-      setTimeout(
-        () => sendReminder(interaction.client, newDevoir, '7d'),
-        r7 - now
-      )
-    }
-    if (r1 > now) {
-      setTimeout(
-        () => sendReminder(interaction.client, newDevoir, '1d-morning'),
-        r1 - now
-      )
-    }
-
-    const guildCfg = getGuildConfig(newDevoir.guildId || '')
-    const timings = [
-      ...(Array.isArray(guildCfg.customTimings) ? guildCfg.customTimings : []),
-      ...perDevoirTimings
-    ]
-
-    if (Array.isArray(timings)) {
-      for (const t of timings) {
-        if (!t || typeof t.offsetMs !== 'number') continue
-        const trigger = deadlineMs - t.offsetMs
-        if (trigger > now) {
-          setTimeout(
-            () =>
-              sendReminder(
-                interaction.client,
-                newDevoir,
-                `custom-${t.label || t.offsetMs.toString()}`
-              ),
-            trigger - now
-          )
-        }
-      }
-    }
   },
 
   scheduleReminders

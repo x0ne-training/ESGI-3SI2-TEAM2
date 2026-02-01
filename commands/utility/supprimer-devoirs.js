@@ -1,6 +1,12 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js')
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  PermissionFlagsBits
+} = require('discord.js')
 const fs = require('fs')
 const path = require('path')
+
+const { cancelByDevoirId } = require('../../services/remindersStore')
 
 const DATA_FILE = path.join(__dirname, '../../data/devoirs.json')
 
@@ -29,6 +35,8 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('supprimer-devoir')
     .setDescription('Supprime un devoir, examen ou projet via une liste.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setContexts(['Guild'])
     .addStringOption(option =>
       option
         .setName('devoir')
@@ -43,10 +51,7 @@ module.exports = {
     const id = Number(value)
 
     if (isNaN(id)) {
-      return interaction.reply({
-        content: '❌ Devoir invalide.',
-        flags: 64
-      })
+      return interaction.reply({ content: '❌ Devoir invalide.', flags: 64 })
     }
 
     const devoirs = readDevoirs()
@@ -62,6 +67,9 @@ module.exports = {
     const updated = devoirs.filter(d => d.id !== id)
     writeDevoirs(updated)
 
+    // ✅ IMPORTANT : annule les rappels persistants
+    const cancelledCount = cancelByDevoirId(id)
+
     const type = target.type || 'devoir'
 
     const embed = new EmbedBuilder()
@@ -73,20 +81,21 @@ module.exports = {
           `📅 ${target.date}\n` +
           `🗂️ ${type}`
       )
+      .addFields({
+        name: '🔕 Rappels persistants',
+        value: `${cancelledCount} rappel(s) annulé(s)`
+      })
       .setTimestamp()
       .setFooter({
         text: 'Bot Discord 3SIB',
         iconURL: interaction.client.user.displayAvatarURL()
       })
 
-    await interaction.reply({
-      embeds: [embed],
-      flags : 64
-    })
+    await interaction.reply({ embeds: [embed], flags: 64 })
   },
 
   async autocomplete (interaction) {
-    const focused = interaction.options.getFocused()
+    const focused = interaction.options.getFocused().toLowerCase()
     const devoirs = readDevoirs()
 
     devoirs.sort((a, b) => {
@@ -98,12 +107,17 @@ module.exports = {
 
     const filtered = devoirs.filter((d, index) => {
       const txt = `${index + 1} ${d.titre} ${d.date}`.toLowerCase()
-      return txt.includes(focused.toLowerCase())
+      return txt.includes(focused)
     })
 
     const choices = filtered.slice(0, 25).map((d, index) => {
       const labelIndex = index + 1
-      const typeLabel = d.type === 'examen' ? 'Examen' : d.type === 'projet' ? 'Projet' : 'Devoir'
+      const typeLabel =
+        d.type === 'examen'
+          ? 'Examen'
+          : d.type === 'projet'
+          ? 'Projet'
+          : 'Devoir'
       return {
         name: `${labelIndex}. [${typeLabel}] ${d.titre} – ${d.date}`,
         value: String(d.id)
