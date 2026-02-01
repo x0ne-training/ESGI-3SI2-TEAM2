@@ -1,4 +1,4 @@
-name: "Vérifier l'utilisation de ephemeral: true dasn les fichiers"
+name: "Vérifier l'utilisation de ephemeral: true dans les fichiers"
 
 on:
   pull_request:
