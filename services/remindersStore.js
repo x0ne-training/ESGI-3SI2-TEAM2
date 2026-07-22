@@ -1,39 +1,18 @@
 // services/remindersStore.js
-const fs = require('fs');
-const path = require('path');
+const { readJson, writeJson } = require('./dataStore');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const FILE_PATH = path.join(DATA_DIR, 'reminders.json');
-
-function ensureFile() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(FILE_PATH)) {
-    fs.writeFileSync(FILE_PATH, JSON.stringify({ version: 1, reminders: [] }, null, 2), 'utf-8');
-  }
-}
+const FILE_NAME = 'reminders.json';
 
 function readAll() {
-  ensureFile();
-  try {
-    const raw = fs.readFileSync(FILE_PATH, 'utf-8');
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object') return { version: 1, reminders: [] };
-    if (!Array.isArray(data.reminders)) data.reminders = [];
-    if (!data.version) data.version = 1;
-    return data;
-  } catch (e) {
-    console.error('Erreur lecture reminders.json :', e);
-    return { version: 1, reminders: [] };
-  }
+  const data = readJson(FILE_NAME, { version: 1, reminders: [] });
+  if (!data || typeof data !== 'object') return { version: 1, reminders: [] };
+  if (!Array.isArray(data.reminders)) data.reminders = [];
+  if (!data.version) data.version = 1;
+  return data;
 }
 
 function writeAll(data) {
-  ensureFile();
-  try {
-    fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (e) {
-    console.error('Erreur écriture reminders.json :', e);
-  }
+  return writeJson(FILE_NAME, data);
 }
 
 function makeId() {

@@ -1,59 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js')
-const fs = require('fs')
-const path = require('path')
-
-const CONFIG_FILE = path.join(__dirname, '../../data/devoirs-config.json')
-
-function readConfig () {
-  if (!fs.existsSync(CONFIG_FILE)) return {}
-  try {
-    return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
-  } catch {
-    return {}
-  }
-}
-
-function writeConfig (cfg) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf-8')
-}
-
-function parseOffset (str) {
-  str = str.toLowerCase().replace(/\s+/g, '')
-
-  let total = 0
-
-  const days = str.match(/(\d+)j/)
-  if (days) total += parseInt(days[1]) * 24 * 60 * 60 * 1000
-
-  const hours = str.match(/(\d+)h/)
-  if (hours) total += parseInt(hours[1]) * 60 * 60 * 1000
-
-  const mins = str.match(/(\d+)m/)
-  if (mins) total += parseInt(mins[1]) * 60 * 1000
-
-  return total > 0 ? total : null
-}
-
-// Affiche un délai lisible (mieux que les ms 💀)
-function formatDuration (ms) {
-  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '—'
-
-  const totalSeconds = Math.floor(ms / 1000)
-  const seconds = totalSeconds % 60
-  const totalMinutes = Math.floor(totalSeconds / 60)
-  const minutes = totalMinutes % 60
-  const totalHours = Math.floor(totalMinutes / 60)
-  const hours = totalHours % 24
-  const days = Math.floor(totalHours / 24)
-
-  const parts = []
-  if (days) parts.push(`${days}j`)
-  if (hours) parts.push(`${hours}h`)
-  if (minutes) parts.push(`${minutes}m`)
-  if (seconds) parts.push(`${seconds}s`)
-  if (parts.length === 0) return '0s'
-  return parts.join(' ')
-}
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js')
+const { readConfig, writeConfig, parseOffset, formatDuration } = require('../../services/devoirsService')
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -117,7 +63,7 @@ module.exports = {
       if (!offset) {
         return interaction.reply({
           content: '❌ Format de délai invalide.',
-          flags: 64
+          flags: MessageFlags.Ephemeral
         })
       }
 
@@ -130,7 +76,7 @@ module.exports = {
 
       return interaction.reply({
         content: `✅ Timing ajouté : **${label}** (${delai}).`,
-        flags: 64
+        flags: MessageFlags.Ephemeral
       })
     }
 
@@ -139,7 +85,7 @@ module.exports = {
       if (list.length === 0) {
         return interaction.reply({
           content: '📭 Aucun timing personnalisé.',
-          flags: 64
+          flags: MessageFlags.Ephemeral
         })
       }
 
@@ -154,7 +100,7 @@ module.exports = {
             .setTitle('⏱️ Timings personnalisés')
             .setDescription(desc)
         ],
-        flags: 64
+        flags: MessageFlags.Ephemeral
       })
     }
 
@@ -165,7 +111,7 @@ module.exports = {
       if (!list[index]) {
         return interaction.reply({
           content: '❌ Index invalide.',
-          flags: 64
+          flags: MessageFlags.Ephemeral
         })
       }
 
@@ -174,7 +120,7 @@ module.exports = {
 
       return interaction.reply({
         content: `Timing supprimé : **${removed[0].label}**`,
-        flags: 64
+        flags: MessageFlags.Ephemeral
       })
     }
   }

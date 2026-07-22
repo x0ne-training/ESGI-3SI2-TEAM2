@@ -1,9 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-// Chemin vers le fichier de configuration des événements
-const EVENTS_CONFIG_PATH = path.join(__dirname, '..', 'events-config.json');
+const { readEventsConfig, writeEventsConfig } = require('./eventsConfigStore');
 
 /**
  * ===============================================
@@ -404,32 +400,11 @@ class ReminderSystem {
     // Fonctions utilitaires
 
     loadEventsConfig() {
-        try {
-            if (fs.existsSync(EVENTS_CONFIG_PATH)) {
-                const data = fs.readFileSync(EVENTS_CONFIG_PATH, 'utf8');
-                return JSON.parse(data);
-            }
-        } catch (error) {
-            console.error('Erreur lors du chargement de la config événements:', error);
-        }
-        
-        return {
-            events: {},
-            reminders: {},
-            settings: {
-                defaultReminderTimes: this.reminderIntervals,
-                maxEventsPerGuild: 50,
-                maxParticipantsPerEvent: 100
-            }
-        };
+        return readEventsConfig();
     }
 
     saveEventsConfig(config) {
-        try {
-            fs.writeFileSync(EVENTS_CONFIG_PATH, JSON.stringify(config, null, 2));
-        } catch (error) {
-            console.error('Erreur lors de la sauvegarde de la config événements:', error);
-        }
+        writeEventsConfig(config);
     }
 
     /**
@@ -443,4 +418,19 @@ class ReminderSystem {
     }
 }
 
+let instance = null;
+
+/**
+ * Démarre le système de rappels d'événements (/event-*) une seule fois.
+ * Expose l'instance sur client.reminderSystem, utilisée par les commandes
+ * event-create/edit/delete/stats et par utils/eventInteractions.js.
+ */
+function startEventReminders(client) {
+  if (instance) return instance;
+  instance = new ReminderSystem(client);
+  client.reminderSystem = instance;
+  return instance;
+}
+
 module.exports = ReminderSystem;
+module.exports.startEventReminders = startEventReminders;

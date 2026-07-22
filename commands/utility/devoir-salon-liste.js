@@ -1,22 +1,5 @@
-const {SlashCommandBuilder,EmbedBuilder,PermissionFlagsBits,ChannelType} = require('discord.js')
-const fs = require('fs')
-const path = require('path')
-
-const CONFIG_FILE = path.join(__dirname, '../../data/devoirs-config.json')
-
-function readConfig () {
-  if (!fs.existsSync(CONFIG_FILE)) return {}
-  try {
-    const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
-    return typeof data === 'object' && data !== null ? data : {}
-  } catch {
-    return {}
-  }
-}
-
-function writeConfig (cfg) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf-8')
-}
+const {SlashCommandBuilder,EmbedBuilder,PermissionFlagsBits,ChannelType, MessageFlags } = require('discord.js')
+const { readConfig, writeConfig } = require('../../services/devoirsService')
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -68,6 +51,6 @@ module.exports = {
       )
       .setTimestamp()
 
-    return interaction.reply({ embeds: [embed], flags: 64 })
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral })
   }
 }

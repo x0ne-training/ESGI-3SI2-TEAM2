@@ -3,13 +3,8 @@ const {
     EmbedBuilder, 
     ActionRowBuilder, 
     ButtonBuilder, 
-    ButtonStyle 
-} = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-// Chemin vers le fichier de configuration des événements
-const EVENTS_CONFIG_PATH = path.join(__dirname, '..', '..', 'events-config.json');
+    ButtonStyle, MessageFlags } = require('discord.js');
+const { readEventsConfig, writeEventsConfig } = require('../../services/eventsConfigStore');
 
 /**
  * =============================================
@@ -140,7 +135,7 @@ module.exports = {
                 if (buttonInteraction.user.id !== interaction.user.id) {
                     return buttonInteraction.reply({
                         content: '❌ Seul l\'utilisateur qui a lancé la commande peut confirmer.',
-                        flags: 64
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -326,30 +321,9 @@ async function notifyParticipants(interaction, event) {
 // Fonctions utilitaires
 
 function loadEventsConfig() {
-    try {
-        if (fs.existsSync(EVENTS_CONFIG_PATH)) {
-            const data = fs.readFileSync(EVENTS_CONFIG_PATH, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.error('Erreur lors du chargement de la config événements:', error);
-    }
-    
-    return {
-        events: {},
-        reminders: {},
-        settings: {
-            defaultReminderTimes: [],
-            maxEventsPerGuild: 50,
-            maxParticipantsPerEvent: 100
-        }
-    };
+    return readEventsConfig();
 }
 
 function saveEventsConfig(config) {
-    try {
-        fs.writeFileSync(EVENTS_CONFIG_PATH, JSON.stringify(config, null, 2));
-    } catch (error) {
-        console.error('Erreur lors de la sauvegarde de la config événements:', error);
-    }
+    writeEventsConfig(config);
 }

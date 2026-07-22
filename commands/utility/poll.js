@@ -38,7 +38,8 @@ module.exports = {
 			.setFooter({ text: `Fin dans ${durationSeconds}s` })
 			.setTimestamp();
 
-		const message = await interaction.reply({ embeds: [pollEmbed], components: [row], fetchReply: true });
+		await interaction.reply({ embeds: [pollEmbed], components: [row] });
+		const message = await interaction.fetchReply();
 
 		const voterIds = new Set();
 		let yesCount = 0;

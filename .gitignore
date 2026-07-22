@@ -113,5 +113,8 @@ events-config.json
 devoirs.json
 devoirs-config.json
 devoirs-archives.json
-stats.json
-data/
+
+# Dossier data/ : uniquement la structure est versionnée (.gitkeep),
+# jamais les données réelles du bot (JSON générés à l'exécution).
+data/*
+!data/.gitkeep

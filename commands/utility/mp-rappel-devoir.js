@@ -1,35 +1,9 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js')
-const fs = require('fs')
-const path = require('path')
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js')
 
 const { addReminder } = require('../../services/remindersStore')
-
-const DATA_FILE = path.join(__dirname, '../../data/devoirs.json')
-
-function readDevoirs () {
-  if (!fs.existsSync(DATA_FILE)) return []
-  try {
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'))
-    return Array.isArray(data) ? data : []
-  } catch (e) {
-    console.error('Erreur lecture devoirs.json :', e)
-    return []
-  }
-}
-
-function parseDateTime (dateStr, heureStr) {
-  // date AAAA-MM-JJ, heure HH:mm
-  const parts = dateStr.split('-').map(Number)
-  if (parts.length !== 3 || parts.some(n => Number.isNaN(n))) return null
-  const [y, m, d] = parts
-
-  const hm = heureStr.split(':').map(Number)
-  if (hm.length !== 2 || hm.some(n => Number.isNaN(n))) return null
-  const [hh, mm] = hm
-
-  const dt = new Date(y, m - 1, d, hh, mm, 0, 0)
-  return Number.isNaN(dt.getTime()) ? null : dt
-}
+const { readDevoirs } = require('../../services/devoirsService')
+const { parseDateTimeLocal } = require('../../services/dateParser')
+const { isFeatureEnabled } = require('../../services/guildConfig')
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -52,20 +26,27 @@ module.exports = {
     ),
 
   async execute (interaction) {
+    if (interaction.guildId && !isFeatureEnabled(interaction.guildId, 'homework')) {
+      return interaction.reply({
+        content: '❌ Le système de devoirs est désactivé sur ce serveur.',
+        flags: MessageFlags.Ephemeral
+      })
+    }
+
     const devoirId = Number(interaction.options.getString('devoir', true))
     const dateStr = interaction.options.getString('date', true)
     const heureStr = interaction.options.getString('heure', true)
 
     const devoir = readDevoirs().find(d => d.id === devoirId)
     if (!devoir) {
-      return interaction.reply({ content: 'Aucun devoir trouvé.', flags: 64 })
+      return interaction.reply({ content: 'Aucun devoir trouvé.', flags: MessageFlags.Ephemeral })
     }
 
-    const target = parseDateTime(dateStr, heureStr)
+    const target = parseDateTimeLocal(dateStr, heureStr)
     if (!target) {
       return interaction.reply({
         content: 'Format de date/heure invalide.',
-        flags: 64
+        flags: MessageFlags.Ephemeral
       })
     }
 
@@ -75,7 +56,7 @@ module.exports = {
     if (when <= now) {
       return interaction.reply({
         content: 'Le rappel doit être dans le futur.',
-        flags: 64
+        flags: MessageFlags.Ephemeral
       })
     }
 
@@ -105,7 +86,7 @@ module.exports = {
       )
       .setTimestamp()
 
-    return interaction.reply({ embeds: [embed], flags: 64 })
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral })
   },
 
   async autocomplete (interaction) {
