@@ -1,35 +1,10 @@
 const {
   SlashCommandBuilder,
   EmbedBuilder,
-  PermissionFlagsBits
-} = require('discord.js')
-const fs = require('fs')
-const path = require('path')
+  PermissionFlagsBits, MessageFlags } = require('discord.js')
 
-const { cancelByDevoirId } = require('../../services/remindersStore')
-
-const DATA_FILE = path.join(__dirname, '../../data/devoirs.json')
-
-// Lecture des devoirs
-function readDevoirs () {
-  if (!fs.existsSync(DATA_FILE)) return []
-  try {
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'))
-    return Array.isArray(data) ? data : []
-  } catch (e) {
-    console.error('Erreur lecture devoirs.json :', e)
-    return []
-  }
-}
-
-// Écriture
-function writeDevoirs (list) {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(list, null, 2), 'utf-8')
-  } catch (e) {
-    console.error('Erreur écriture devoirs.json :', e)
-  }
-}
+const devoirsService = require('../../services/devoirsService')
+const { isFeatureEnabled } = require('../../services/guildConfig')
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -47,29 +22,29 @@ module.exports = {
   emoji: '❌',
 
   async execute (interaction) {
+    if (!isFeatureEnabled(interaction.guildId, 'homework')) {
+      return interaction.reply({
+        content: '❌ Le système de devoirs est désactivé sur ce serveur.',
+        flags: MessageFlags.Ephemeral
+      })
+    }
+
     const value = interaction.options.getString('devoir', true)
     const id = Number(value)
 
     if (isNaN(id)) {
-      return interaction.reply({ content: '❌ Devoir invalide.', flags: 64 })
+      return interaction.reply({ content: '❌ Devoir invalide.', flags: MessageFlags.Ephemeral })
     }
 
-    const devoirs = readDevoirs()
-    const target = devoirs.find(d => d.id === id)
-
-    if (!target) {
+    const result = devoirsService.deleteDevoir(id)
+    if (!result.ok) {
       return interaction.reply({
-        content: '❌ Aucun devoir/examen/projet trouvé avec cette valeur.',
-        flags: 64
+        content: `❌ ${result.error}`,
+        flags: MessageFlags.Ephemeral
       })
     }
 
-    const updated = devoirs.filter(d => d.id !== id)
-    writeDevoirs(updated)
-
-    // ✅ IMPORTANT : annule les rappels persistants
-    const cancelledCount = cancelByDevoirId(id)
-
+    const { devoir: target, cancelledCount } = result
     const type = target.type || 'devoir'
 
     const embed = new EmbedBuilder()
@@ -91,12 +66,12 @@ module.exports = {
         iconURL: interaction.client.user.displayAvatarURL()
       })
 
-    await interaction.reply({ embeds: [embed], flags: 64 })
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral })
   },
 
   async autocomplete (interaction) {
     const focused = interaction.options.getFocused().toLowerCase()
-    const devoirs = readDevoirs()
+    const devoirs = devoirsService.readDevoirs()
 
     devoirs.sort((a, b) => {
       const da = new Date(a.date)

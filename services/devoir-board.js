@@ -1,40 +1,13 @@
 const { EmbedBuilder } = require('discord.js')
-const fs = require('fs')
-const path = require('path')
+const devoirsService = require('./devoirsService')
+const { parseDateYYYYMMDD } = require('./dateParser')
+const { isFeatureEnabled } = require('./guildConfig')
 
-const CONFIG_FILE = path.join(__dirname, '../data/devoirs-config.json')
-const DATA_FILE = path.join(__dirname, '../data/devoirs.json')
-const ARCHIVE_FILE = path.join(__dirname, '../data/devoirs-archives.json')
+const { TYPE_LABELS, IMPORTANCE_LABELS } = devoirsService
 
-const TYPE_LABELS = {
-  devoir: '📘 Devoirs',
-  examen: '🧪 Examens',
-  projet: '🛠️ Projets'
-}
-
-const IMPORTANCE_LABELS = {
-  faible: 'Peu important',
-  important: 'Important',
-  tres_important: 'Très important'
-}
-
-function readJson (file, fallback) {
-  if (!fs.existsSync(file)) return fallback
-  try {
-    const data = JSON.parse(fs.readFileSync(file, 'utf-8'))
-    return data ?? fallback
-  } catch {
-    return fallback
-  }
-}
-
-function writeJson (file, data) {
-  try {
-    fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8')
-  } catch (e) {
-    console.error('Erreur écriture JSON:', file, e)
-  }
-}
+const CATEGORY_ORDER = ['devoir', 'examen', 'projet']
+const CATEGORY_COLORS = { devoir: 0x2ecc71, examen: 0x9b59b6, projet: 0x3498db }
+const DESCRIPTION_MAX = 4096
 
 function todayKey () {
   const now = new Date()
@@ -44,167 +17,113 @@ function todayKey () {
   return `${y}-${m}-${d}`
 }
 
-function parseDateSafe (yyyyMMdd) {
-  const d = new Date(yyyyMMdd)
-  return isNaN(d.getTime()) ? null : d
+function importanceScore (imp) {
+  if (imp === 'tres_important') return 2
+  if (imp === 'important') return 1
+  return 0
 }
 
-// Lectures/écritures des devoirs
-function readDevoirs () {
-  if (!fs.existsSync(DATA_FILE)) return []
-  try {
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'))
-    return Array.isArray(data) ? data : []
-  } catch (e) {
-    console.error('Erreur lecture devoirs.json :', e)
-    return []
-  }
+// Trie du plus proche au plus éloigné, puis par importance décroissante,
+// puis par titre pour un ordre stable en cas d'égalité totale.
+function sortItems (items) {
+  return items.slice().sort((a, b) => {
+    const dateDiff = a._date.getTime() - b._date.getTime()
+    if (dateDiff !== 0) return dateDiff
+    const impDiff = importanceScore(b.importance) - importanceScore(a.importance)
+    if (impDiff !== 0) return impDiff
+    return (a.titre || '').localeCompare(b.titre || '')
+  })
 }
 
-function writeDevoirs (list) {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(list, null, 2), 'utf-8')
-  } catch (e) {
-    console.error('Erreur écriture devoirs.json :', e)
-  }
+function formatLine (d) {
+  const timestamp = Math.floor(d._date.getTime() / 1000)
+  const impLabel = IMPORTANCE_LABELS[d.importance || 'important'] || 'Important'
+  const desc = d.description ? ` — ${d.description}` : ''
+  return `• **${d.titre}** — <t:${timestamp}:D> (<t:${timestamp}:R>) — 📍 ${impLabel}${desc}`
 }
 
-// Lectures/écritures des archives
-function readArchive () {
-  if (!fs.existsSync(ARCHIVE_FILE)) return []
-  try {
-    const data = JSON.parse(fs.readFileSync(ARCHIVE_FILE, 'utf-8'))
-    return Array.isArray(data) ? data : []
-  } catch (e) {
-    console.error('Erreur lecture devoirs-archives.json :', e)
-    return []
+// Construit une description bornée à la limite Discord, sans tronquer
+// silencieusement : si tout ne tient pas, on l'indique explicitement.
+function buildBoundedDescription (lines) {
+  let description = ''
+  let shown = 0
+  for (const line of lines) {
+    const candidate = description ? `${description}\n${line}` : line
+    if (candidate.length > DESCRIPTION_MAX - 60) break
+    description = candidate
+    shown++
   }
+  if (shown < lines.length) {
+    description += `\n\n*… et ${lines.length - shown} élément(s) supplémentaire(s) non affiché(s).*`
+  }
+  return description
 }
 
-function writeArchive (list) {
-  try {
-    fs.writeFileSync(ARCHIVE_FILE, JSON.stringify(list, null, 2), 'utf-8')
-  } catch (e) {
-    console.error('Erreur écriture devoirs-archives.json :', e)
-  }
-}
-
-// Déplace les devoirs passés vers les archives
-function movePastDevoirsToArchive () {
-  const now = new Date()
-  const todayMidnight = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  ).getTime()
-
-  const current = readDevoirs()
-  const archived = readArchive()
-
-  const alreadyIds = new Set(archived.map(d => d && d.id).filter(Boolean))
-
-  const stillCurrent = []
-  const toArchive = []
-
-  for (const d of current) {
-    const dDate = new Date(d.date)
-
-    if (isNaN(dDate.getTime())) {
-      stillCurrent.push(d)
-      continue
-    }
-
-    if (dDate.getTime() < todayMidnight) {
-      if (d && d.id && !alreadyIds.has(d.id)) {
-        toArchive.push(d)
-        alreadyIds.add(d.id)
-      }
-    } else {
-      stillCurrent.push(d)
-    }
+function buildBoardEmbeds (items) {
+  if (items.length === 0) {
+    return [
+      new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle('📚 Tableau des devoirs')
+        .setDescription('📭 Aucun devoir, examen ou projet à venir pour le moment.')
+        .setTimestamp(),
+    ]
   }
 
-  if (toArchive.length > 0) {
-    writeDevoirs(stillCurrent)
-    writeArchive([...archived, ...toArchive])
-  }
-
-  return toArchive.length
-}
-
-// Crée l'embed Discord du tableau
-function buildBoardEmbed (items) {
   const byType = { devoir: [], examen: [], projet: [] }
-
   for (const d of items) {
-    const t = d.type || 'devoir'
-    if (!byType[t]) byType[t] = []
+    const t = byType[d.type] ? d.type : 'devoir'
     byType[t].push(d)
   }
-  for (const t of Object.keys(byType)) {
-    byType[t].sort((a, b) => new Date(a.date) - new Date(b.date))
+
+  const embeds = []
+  for (const type of CATEGORY_ORDER) {
+    const list = byType[type]
+    if (!list || list.length === 0) continue
+
+    const sorted = sortItems(list)
+    const lines = sorted.map(formatLine)
+
+    embeds.push(
+      new EmbedBuilder()
+        .setColor(CATEGORY_COLORS[type])
+        .setTitle(TYPE_LABELS[type])
+        .setDescription(buildBoundedDescription(lines))
+        .setFooter({ text: `${list.length} élément(s) — mise à jour automatique` })
+        .setTimestamp()
+    )
   }
 
-  const embed = new EmbedBuilder()
-    .setColor(0x3498db)
-    .setTitle('📚 Tableau des devoirs')
-    .setDescription('Mise à jour automatique quotidienne.')
-    .setTimestamp()
-
-  const makeSection = typeKey => {
-    const list = byType[typeKey] || []
-    if (list.length === 0) return '📭 Rien à afficher.'
-
-    return list
-      .slice(0, 25)
-      .map(d => {
-        const imp =
-          IMPORTANCE_LABELS[d.importance || 'important'] || 'Important'
-        const desc = d.description ? ` — ${d.description}` : ''
-        return `• **${d.titre}** — 📅 ${d.date} — 📍 ${imp}${desc}`
-      })
-      .join('\n')
-  }
-
-  embed.addFields(
-    { name: TYPE_LABELS.devoir, value: makeSection('devoir') },
-    { name: TYPE_LABELS.examen, value: makeSection('examen') },
-    { name: TYPE_LABELS.projet, value: makeSection('projet') }
-  )
-
-  return embed
+  return embeds
 }
 
 // Met à jour le tableau pour une guilde
 async function updateGuildBoard (client, guildId, cfg) {
   const gcfg = cfg[guildId]
   if (!gcfg?.boardChannelId) return
+  if (!isFeatureEnabled(guildId, 'homework')) return
 
   const channel = await client.channels
     .fetch(gcfg.boardChannelId)
     .catch(() => null)
   if (!channel) return
 
-  const moved = movePastDevoirsToArchive()
+  const moved = devoirsService.movePastDevoirsToArchive()
   if (moved > 0) {
-    console.log(
-      `[DevoirBoard] ${moved} élément(s) archivé(s) avant la mise à jour du tableau.`
-    )
+    console.log(`[DevoirBoard] ${moved} élément(s) archivé(s) avant la mise à jour du tableau.`)
   }
 
-  const devoirs = readDevoirs()
+  const devoirs = devoirsService.readDevoirs()
 
   const today0 = new Date()
   today0.setHours(0, 0, 0, 0)
   const todayMs = today0.getTime()
 
-  // Filtre les devoirs d'aujourd'hui et après
   const items = devoirs
     .filter(d => d && d.guildId === guildId)
-    .map(d => ({ ...d, _date: parseDateSafe(d.date) }))
+    .map(d => ({ ...d, _date: parseDateYYYYMMDD(d.date) }))
     .filter(d => d._date && d._date.getTime() >= todayMs)
 
-  // Supprime l'ancien message si existe
   if (gcfg.boardMessageId) {
     await channel.messages
       .fetch(gcfg.boardMessageId)
@@ -212,26 +131,22 @@ async function updateGuildBoard (client, guildId, cfg) {
       .catch(() => null)
   }
 
-  // Envoie le nouveau message
-  const embed = buildBoardEmbed(items)
-  const sent = await channel.send({ embeds: [embed] })
+  const embeds = buildBoardEmbeds(items)
+  const sent = await channel.send({ embeds })
 
-  // Sauvegarde l'ID du nouveau message
   cfg[guildId].boardMessageId = sent.id
   cfg[guildId].boardLastUpdate = todayKey()
-  writeJson(CONFIG_FILE, cfg)
+  devoirsService.writeConfig(cfg)
 }
 
 // Met à jour les tableaux de toutes les guildes
 async function updateAllBoards (client, force = false) {
-  const cfg = readJson(CONFIG_FILE, {})
+  const cfg = devoirsService.readConfig()
   const key = todayKey()
 
   for (const guildId of Object.keys(cfg)) {
     const gcfg = cfg[guildId]
     if (!gcfg?.boardChannelId) continue
-
-    // Skip si déjà mis à jour aujourd'hui (sauf si force=true)
     if (!force && gcfg.boardLastUpdate === key) continue
 
     await updateGuildBoard(client, guildId, cfg).catch(e => {
@@ -245,12 +160,13 @@ function initDevoirBoard (client) {
   updateAllBoards(client, false).catch(() => null)
 
   // Mise à jour toutes les heures
-  setInterval(() => {
+  const timer = setInterval(() => {
     updateAllBoards(client, false).catch(() => null)
   }, 60 * 60 * 1000)
+  timer.unref?.()
 
-  // Expose une fonction pour forcer la mise à jour
+  // Expose une fonction pour forcer la mise à jour (panel, commandes de config)
   client.forceDevoirBoardUpdate = () => updateAllBoards(client, true)
 }
 
-module.exports = { initDevoirBoard }
+module.exports = { initDevoirBoard, buildBoardEmbeds, updateGuildBoard, updateAllBoards }

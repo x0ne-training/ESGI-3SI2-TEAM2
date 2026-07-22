@@ -1,9 +1,5 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-// Chemin vers le fichier de configuration des événements
-const EVENTS_CONFIG_PATH = path.join(__dirname, '..', 'events-config.json');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { readEventsConfig, writeEventsConfig } = require('../services/eventsConfigStore');
 
 /**
  * ================================================
@@ -57,7 +53,7 @@ async function handleEventInteraction(interaction) {
         if (!event) {
             return await interaction.reply({
                 content: '❌ Cet événement n\'existe plus ou a été supprimé.',
-                flags: 64
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -68,7 +64,7 @@ async function handleEventInteraction(interaction) {
         if (eventDate <= now && action !== 'info') {
             return await interaction.reply({
                 content: '❌ Cet événement est déjà passé, vous ne pouvez plus modifier votre participation.',
-                flags: 64
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -91,7 +87,7 @@ async function handleEventInteraction(interaction) {
         console.error('Erreur lors du traitement de l\'interaction d\'événement:', error);
         await interaction.reply({
             content: '❌ Une erreur est survenue lors du traitement de votre demande.',
-            flags: 64
+            flags: MessageFlags.Ephemeral
         });
     }
 }
@@ -106,7 +102,7 @@ async function handleAttendEvent(interaction, event, eventsConfig) {
     if (event.participants.attending.includes(userId)) {
         return await interaction.reply({
             content: '✅ Vous participez déjà à cet événement!',
-            flags: 64
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -114,7 +110,7 @@ async function handleAttendEvent(interaction, event, eventsConfig) {
     if (event.participants.attending.length >= event.maxParticipants) {
         return await interaction.reply({
             content: `❌ Cet événement est complet (${event.maxParticipants}/${event.maxParticipants} participants).`,
-            flags: 64
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -134,7 +130,7 @@ async function handleAttendEvent(interaction, event, eventsConfig) {
     // Confirmer à l'utilisateur
     await interaction.reply({
         content: `✅ Parfait! Vous participez maintenant à **${event.title}**.`,
-        flags: 64
+        flags: MessageFlags.Ephemeral
     });
 
     // Notifier le créateur si c'est le premier participant
@@ -153,7 +149,7 @@ async function handleMaybeEvent(interaction, event, eventsConfig) {
     if (event.participants.maybe.includes(userId)) {
         return await interaction.reply({
             content: '❓ Vous êtes déjà marqué comme "peut-être" pour cet événement!',
-            flags: 64
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -173,7 +169,7 @@ async function handleMaybeEvent(interaction, event, eventsConfig) {
     // Confirmer à l'utilisateur
     await interaction.reply({
         content: `❓ Noté! Vous êtes marqué comme "peut-être" pour **${event.title}**.`,
-        flags: 64
+        flags: MessageFlags.Ephemeral
     });
 }
 
@@ -187,7 +183,7 @@ async function handleDeclineEvent(interaction, event, eventsConfig) {
     if (event.participants.notAttending.includes(userId)) {
         return await interaction.reply({
             content: '❌ Vous avez déjà décliné cet événement!',
-            flags: 64
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -207,7 +203,7 @@ async function handleDeclineEvent(interaction, event, eventsConfig) {
     // Confirmer à l'utilisateur
     await interaction.reply({
         content: `❌ Compris! Vous ne participez pas à **${event.title}**.`,
-        flags: 64
+        flags: MessageFlags.Ephemeral
     });
 }
 
@@ -298,7 +294,7 @@ async function handleEventInfo(interaction, event) {
 
     await interaction.reply({
         embeds: [embed],
-        flags: 64
+        flags: MessageFlags.Ephemeral
     });
 }
 
@@ -347,32 +343,11 @@ async function notifyEventCreator(interaction, event, type) {
 // Fonctions utilitaires
 
 function loadEventsConfig() {
-    try {
-        if (fs.existsSync(EVENTS_CONFIG_PATH)) {
-            const data = fs.readFileSync(EVENTS_CONFIG_PATH, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.error('Erreur lors du chargement de la config événements:', error);
-    }
-    
-    return {
-        events: {},
-        reminders: {},
-        settings: {
-            defaultReminderTimes: [],
-            maxEventsPerGuild: 50,
-            maxParticipantsPerEvent: 100
-        }
-    };
+    return readEventsConfig();
 }
 
 function saveEventsConfig(config) {
-    try {
-        fs.writeFileSync(EVENTS_CONFIG_PATH, JSON.stringify(config, null, 2));
-    } catch (error) {
-        console.error('Erreur lors de la sauvegarde de la config événements:', error);
-    }
+    writeEventsConfig(config);
 }
 
 function removeUserFromAllLists(participants, userId) {

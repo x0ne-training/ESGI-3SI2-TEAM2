@@ -4,13 +4,8 @@ const {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle,
-    ChannelType 
-} = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-// Chemin vers le fichier de configuration des événements
-const EVENTS_CONFIG_PATH = path.join(__dirname, '..', '..', 'events-config.json');
+    ChannelType, MessageFlags } = require('discord.js');
+const { readEventsConfig, writeEventsConfig } = require('../../services/eventsConfigStore');
 
 /**
  * =============================================
@@ -101,7 +96,7 @@ module.exports = {
         if (!interaction.member.permissions.has('ManageEvents') && !interaction.member.permissions.has('Administrator')) {
             return await interaction.reply({
                 content: '❌ Vous devez avoir la permission "Gérer les événements" pour créer un événement.',
-                flags: 64
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -271,37 +266,11 @@ function generateEventId(guildId) {
 }
 
 function loadEventsConfig() {
-    try {
-        if (fs.existsSync(EVENTS_CONFIG_PATH)) {
-            const data = fs.readFileSync(EVENTS_CONFIG_PATH, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.error('Erreur lors du chargement de la config événements:', error);
-    }
-    
-    // Configuration par défaut
-    return {
-        events: {},
-        reminders: {},
-        settings: {
-            defaultReminderTimes: [
-                {"value": 24, "unit": "hours", "label": "24h avant"},
-                {"value": 1, "unit": "hours", "label": "1h avant"},
-                {"value": 15, "unit": "minutes", "label": "15min avant"}
-            ],
-            maxEventsPerGuild: 50,
-            maxParticipantsPerEvent: 100
-        }
-    };
+    return readEventsConfig();
 }
 
 function saveEventsConfig(config) {
-    try {
-        fs.writeFileSync(EVENTS_CONFIG_PATH, JSON.stringify(config, null, 2));
-    } catch (error) {
-        console.error('Erreur lors de la sauvegarde de la config événements:', error);
-    }
+    writeEventsConfig(config);
 }
 
 function createEventEmbed(eventData, client) {

@@ -1,36 +1,41 @@
-const { SlashCommandBuilder } = require("discord.js");
-const fs = require("fs");
-const path = require("path"); 
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const statsStore = require("../../services/statsStore");
+const { isFeatureEnabled } = require("../../services/guildConfig");
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("stats")
         .setDescription("Affiche le top des membres les plus actifs"),
     async execute(interaction) {
-        // On remonte de deux dossiers (de 'commands/utility' vers la racine)
-        const statsPath = path.resolve(__dirname, "../../stats.json");
-        
-        const stats = fs.existsSync(statsPath) ? JSON.parse(fs.readFileSync(statsPath)) : {};
-    const sorted = Object.entries(stats).sort((a,b) => b[1]-a[1]).slice(0,5);
+        if (interaction.guildId && !isFeatureEnabled(interaction.guildId, "stats")) {
+            return interaction.reply({
+                content: "📊 La collecte des statistiques est désactivée sur ce serveur.",
+                flags: MessageFlags.Ephemeral,
+            });
+        }
 
-    let reply = "🏆 Classement des membres les plus actifs :\n";
-    // On prépare toutes les demandes de récupération (fetch) en même temps
-    const memberPromises = sorted.map(([id]) => 
-        interaction.guild.members.fetch(id).catch(() => null)
-    );
+        const sorted = statsStore.getTopUsers(5);
 
-    // On attend que TOUT soit fini d'un coup
-    const members = await Promise.all(memberPromises);
+        if (sorted.length === 0) {
+            return interaction.reply({
+                content: "📭 Aucune statistique disponible pour le moment.",
+                flags: MessageFlags.Ephemeral,
+            });
+        }
 
-    // Maintenant on fait la boucle d'affichage
-    for (let i = 0; i < sorted.length; i++) {
-        const [id, count] = sorted[i];
-        const member = members[i];
-        // Si le membre est trouvé (pas null), on prend son pseudo, sinon "Inconnu"
-        const username = member ? member.user.username : "Utilisateur inconnu";
-        // On ajoute la ligne au message de réponse
-        reply += `${i + 1}. **${username}** : ${count} messages\n`;
-    }
-    await interaction.reply(reply);
+        let reply = "🏆 Classement des membres les plus actifs :\n";
+        const memberPromises = sorted.map(([id]) =>
+            interaction.guild.members.fetch(id).catch(() => null)
+        );
+
+        const members = await Promise.all(memberPromises);
+
+        for (let i = 0; i < sorted.length; i++) {
+            const [id, count] = sorted[i];
+            const member = members[i];
+            const username = member ? member.user.username : "Utilisateur inconnu";
+            reply += `${i + 1}. **${username}** : ${count} messages\n`;
+        }
+        await interaction.reply(reply);
   }
 };

@@ -4,13 +4,8 @@ const {
     ActionRowBuilder, 
     StringSelectMenuBuilder,
     ButtonBuilder,
-    ButtonStyle 
-} = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-// Chemin vers le fichier de configuration des événements
-const EVENTS_CONFIG_PATH = path.join(__dirname, '..', '..', 'events-config.json');
+    ButtonStyle, MessageFlags } = require('discord.js');
+const { readEventsConfig, writeEventsConfig } = require('../../services/eventsConfigStore');
 
 /**
  * ==========================================
@@ -144,7 +139,7 @@ module.exports = {
                     if (componentInteraction.user.id !== interaction.user.id) {
                         return componentInteraction.reply({
                             content: '❌ Seul l\'utilisateur qui a lancé la commande peut naviguer.',
-                            flags: 64
+                            flags: MessageFlags.Ephemeral
                         });
                     }
 
@@ -179,7 +174,7 @@ module.exports = {
                             const detailEmbed = createEventDetailEmbed(event, interaction.client);
                             await componentInteraction.reply({
                                 embeds: [detailEmbed],
-                                flags: 64
+                                flags: MessageFlags.Ephemeral
                             });
                         }
                     }
@@ -217,24 +212,7 @@ module.exports = {
 // Fonctions utilitaires
 
 function loadEventsConfig() {
-    try {
-        if (fs.existsSync(EVENTS_CONFIG_PATH)) {
-            const data = fs.readFileSync(EVENTS_CONFIG_PATH, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.error('Erreur lors du chargement de la config événements:', error);
-    }
-    
-    return {
-        events: {},
-        reminders: {},
-        settings: {
-            defaultReminderTimes: [],
-            maxEventsPerGuild: 50,
-            maxParticipantsPerEvent: 100
-        }
-    };
+    return readEventsConfig();
 }
 
 function createNoEventsEmbed(statusFilter = null) {

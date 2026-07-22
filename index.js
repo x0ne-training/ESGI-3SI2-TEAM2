@@ -75,5 +75,19 @@ process.on('uncaughtException', error => {
   process.exit(1);
 });
 
-// 5) Connexion
+// 5) Arrêt propre (Docker envoie SIGTERM) : on sauvegarde les données en attente
+const statsStore = require('./services/statsStore');
+let shuttingDown = false;
+function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`🛑 Signal ${signal} reçu, arrêt en cours...`);
+  statsStore.forceFlush();
+  client.destroy();
+  process.exit(0);
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// 6) Connexion
 client.login(process.env.DISCORD_TOKEN);

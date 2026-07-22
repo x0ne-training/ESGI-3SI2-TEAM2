@@ -1,45 +1,8 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js')
-const fs = require('fs')
-const path = require('path')
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js')
+const devoirsService = require('../../services/devoirsService')
+const { isFeatureEnabled } = require('../../services/guildConfig')
 
-const DATA_FILE = path.join(__dirname, '../../data/devoirs.json')
-
-// Lecture des devoirs + type par défaut pour les anciens 🧑‍🦳
-function readDevoirs () {
-  if (!fs.existsSync(DATA_FILE)) return []
-  try {
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'))
-    if (!Array.isArray(data)) return []
-    return data.map(d => ({
-      type: 'devoir',
-      importance: 'important',
-      ...d,
-      type: d.type || 'devoir',
-      importance: d.importance || 'important'
-    }))
-  } catch (e) {
-    console.error('Erreur lecture devoirs.json :', e)
-    return []
-  }
-}
-
-const TYPE_LABELS = {
-  devoir: 'Devoir',
-  examen: 'Examen',
-  projet: 'Projet'
-}
-
-const IMPORTANCE_LABELS = {
-  faible: 'Peu important',
-  important: 'Important',
-  tres_important: 'Très important'
-}
-
-function importanceScore (imp) {
-  if (imp === 'tres_important') return 2
-  if (imp === 'important') return 1
-  return 0
-}
+const { TYPE_LABELS, IMPORTANCE_LABELS } = devoirsService
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -59,31 +22,22 @@ module.exports = {
   emoji: '📚',
 
   async execute (interaction) {
-    const filterType = interaction.options.getString('type') || null
-    let devoirs = readDevoirs()
-
-    if (filterType) {
-      devoirs = devoirs.filter(d => d.type === filterType)
+    if (interaction.guildId && !isFeatureEnabled(interaction.guildId, 'homework')) {
+      return interaction.reply({
+        content: '❌ Le système de devoirs est désactivé sur ce serveur.',
+        flags: MessageFlags.Ephemeral
+      })
     }
+
+    const filterType = interaction.options.getString('type') || null
+    const devoirs = devoirsService.listDevoirs({ guildId: interaction.guildId, type: filterType })
 
     if (devoirs.length === 0) {
       return interaction.reply({
         content: '📭 Aucun élément correspondant n’a été trouvé.',
-        flags: 64
+        flags: MessageFlags.Ephemeral
       })
     }
-
-    // Tri: importance desc puis date asc
-    devoirs.sort((a, b) => {
-      const ia = importanceScore(a.importance)
-      const ib = importanceScore(b.importance)
-      if (ia !== ib) return ib - ia
-
-      const da = new Date(a.date)
-      const db = new Date(b.date)
-      if (isNaN(da) || isNaN(db)) return 0
-      return da - db
-    })
 
     const max = 20
     const slice = devoirs.slice(0, max)
@@ -122,7 +76,7 @@ module.exports = {
 
     await interaction.reply({
       embeds: [embed],
-      flags: 64
+      flags: MessageFlags.Ephemeral
     })
   }
 }

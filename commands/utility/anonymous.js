@@ -2,8 +2,7 @@ const {
   SlashCommandBuilder,
   PermissionFlagsBits,
   ChannelType,
-  EmbedBuilder,
-} = require("discord.js");
+  EmbedBuilder, MessageFlags } = require('discord.js');
 
 // Empêche les pings @everyone, @here, rôles et users (normalement)
 function sanitizeForNoPings(text) {
@@ -49,7 +48,7 @@ module.exports = {
       return interaction.reply({
         content:
           "Je ne peux envoyer des messages que dans un salon textuel du serveur.",
-        flags: 64,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -59,7 +58,7 @@ module.exports = {
       return interaction.reply({
         content:
           "Je n’ai pas la permission d’envoyer des messages dans ce salon.",
-        flags: 64,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -86,12 +85,12 @@ module.exports = {
         })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [confirm], flags: 64 });
+      await interaction.reply({ embeds: [confirm], flags: MessageFlags.Ephemeral });
     } catch (err) {
       console.error("Anonymous send error:", err);
       await interaction.reply({
         content: "Une erreur est survenue lors de l’envoi du message.",
-        flags: 64,
+        flags: MessageFlags.Ephemeral,
       });
     }
   },
