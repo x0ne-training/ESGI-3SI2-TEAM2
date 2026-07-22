@@ -37,34 +37,42 @@ module.exports = {
     async execute(interaction) {
         // Récupérer toutes les commandes disponibles
         const commands = interaction.client.commands;
-        const commandFields = [];
 
-        // Parcourir toutes les commandes et créer les champs
-        commands.forEach(command => {
-            const emoji = command.emoji || '🔧'; // Emoji par défaut si non défini
-            const description = command.data.description;
-            
-            commandFields.push({
-                name: `${emoji} /${command.data.name}`,
-                value: description,
-                inline: true
-            });
-        });
+        // Une ligne par commande, triée par nom. On utilise la description
+        // de l'embed (limite 4096 caractères) plutôt que des fields (limite
+        // 25 fields max) : le nombre de commandes n'est pas borné à 25.
+        const lines = commands
+            .map(command => `${command.emoji || '🔧'} **/${command.data.name}** — ${command.data.description}`)
+            .sort((a, b) => a.localeCompare(b));
 
-        // Trier les commandes par nom pour un affichage ordonné
-        commandFields.sort((a, b) => a.name.localeCompare(b.name));
+        // Découpe en plusieurs embeds si jamais la liste devient trop longue,
+        // pour ne jamais tronquer silencieusement des commandes.
+        const DESCRIPTION_MAX = 4096;
+        const chunks = [];
+        let current = '';
+        for (const line of lines) {
+            const candidate = current ? `${current}\n${line}` : line;
+            if (candidate.length > DESCRIPTION_MAX) {
+                chunks.push(current);
+                current = line;
+            } else {
+                current = candidate;
+            }
+        }
+        if (current) chunks.push(current);
 
-        const embed = new EmbedBuilder()
-            .setColor(0x0099FF)
-            .setTitle('🤖 Aide - 3SIB Bot')
-            .setDescription(`Voici la liste des **${commandFields.length}** commandes disponibles :`)
-            .addFields(commandFields)
-            .setFooter({ 
-                text: 'Bot Discord 3SIB', 
-                iconURL: interaction.client.user.displayAvatarURL() 
-            })
-            .setTimestamp();
+        const embeds = chunks.map((description, index) =>
+            new EmbedBuilder()
+                .setColor(0x0099FF)
+                .setTitle(index === 0 ? '🤖 Aide - 3SIB Bot' : `🤖 Aide - 3SIB Bot (suite ${index + 1})`)
+                .setDescription(index === 0 ? `Voici la liste des **${lines.length}** commandes disponibles :\n\n${description}` : description)
+                .setFooter({
+                    text: 'Bot Discord 3SIB',
+                    iconURL: interaction.client.user.displayAvatarURL()
+                })
+                .setTimestamp()
+        );
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ embeds: embeds.slice(0, 10) });
     },
 };
