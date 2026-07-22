@@ -1,8 +1,5 @@
-const fs = require('fs');
-const path = require('path');
-
-// Chemin vers le fichier de configuration des événements
-const EVENTS_CONFIG_PATH = path.join(__dirname, '..', 'events-config.json');
+const { readEventsConfig, writeEventsConfig } = require('./eventsConfigStore');
+const { isFeatureEnabled } = require('./guildConfig');
 
 /**
  * ===============================================
@@ -48,8 +45,12 @@ class RecurringEventsManager {
 
             // Parcourir tous les serveurs
             for (const guildId in eventsConfig.events) {
+                // Ne pas générer de nouvelles occurrences si la fonctionnalité est désactivée
+                // pour cette guild (les occurrences déjà créées restent intactes).
+                if (!isFeatureEnabled(guildId, 'recurringEvents')) continue;
+
                 const guildEvents = eventsConfig.events[guildId];
-                
+
                 // Parcourir tous les événements du serveur
                 for (const eventId in guildEvents) {
                     const event = guildEvents[eventId];
@@ -397,33 +398,25 @@ class RecurringEventsManager {
     }
 
     loadEventsConfig() {
-        try {
-            if (fs.existsSync(EVENTS_CONFIG_PATH)) {
-                const data = fs.readFileSync(EVENTS_CONFIG_PATH, 'utf8');
-                return JSON.parse(data);
-            }
-        } catch (error) {
-            console.error('Erreur lors du chargement de la config événements:', error);
-        }
-        
-        return {
-            events: {},
-            reminders: {},
-            settings: {
-                defaultReminderTimes: [],
-                maxEventsPerGuild: 50,
-                maxParticipantsPerEvent: 100
-            }
-        };
+        return readEventsConfig();
     }
 
     saveEventsConfig(config) {
-        try {
-            fs.writeFileSync(EVENTS_CONFIG_PATH, JSON.stringify(config, null, 2));
-        } catch (error) {
-            console.error('Erreur lors de la sauvegarde de la config événements:', error);
-        }
+        writeEventsConfig(config);
     }
 }
 
+let instance = null;
+
+/**
+ * Démarre le gestionnaire d'événements récurrents une seule fois.
+ */
+function startRecurringEvents(client) {
+  if (instance) return instance;
+  instance = new RecurringEventsManager(client);
+  client.recurringEventsManager = instance;
+  return instance;
+}
+
 module.exports = RecurringEventsManager;
+module.exports.startRecurringEvents = startRecurringEvents;

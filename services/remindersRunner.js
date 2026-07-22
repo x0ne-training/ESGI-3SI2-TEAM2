@@ -1,11 +1,9 @@
 // services/remindersRunner.js
 const { EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
 
 const { getPendingDue, markSent, cleanupOldSent } = require('./remindersStore');
-
-const CONFIG_FILE = path.join(__dirname, '..', 'data', 'devoirs-config.json');
+const { readConfig } = require('./devoirsService');
+const { isFeatureEnabled } = require('./guildConfig');
 
 const TYPE_LABELS = {
   devoir: 'Devoir',
@@ -18,18 +16,6 @@ const IMPORTANCE_LABELS = {
   important: 'Important',
   tres_important: 'Très important',
 };
-
-function readConfigSafe() {
-  try {
-    if (!fs.existsSync(CONFIG_FILE)) return {};
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const data = JSON.parse(raw);
-    return data && typeof data === 'object' ? data : {};
-  } catch (e) {
-    console.error('Erreur lecture devoirs-config.json :', e);
-    return {};
-  }
-}
 
 function getGuildConfig(config, guildId) {
   const g = config?.[guildId] || {};
@@ -117,9 +103,13 @@ function startRemindersRunner(client, { intervalMs = 30_000 } = {}) {
       const due = getPendingDue(Date.now());
       if (due.length === 0) return;
 
-      const config = readConfigSafe();
+      const config = readConfig();
 
       for (const r of due) {
+        // Rappels suspendus si le système de devoirs est désactivé pour cette guild
+        // (ils restent "pending" et repartiront normalement une fois réactivé).
+        if (r.guildId && !isFeatureEnabled(r.guildId, 'homework')) continue;
+
         // ✅ 1) Rappels en DM (persistants)
         if (r.delivery === 'dm') {
           try {

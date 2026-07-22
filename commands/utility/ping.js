@@ -28,14 +28,13 @@ module.exports = {
 
     emoji: '🏓',
     async execute(interaction) {
-        const sent = await interaction.reply({ 
-            content: 'Pong! 🏓', 
-            fetchReply: true 
-        });
-        
-        const latency = sent.createdTimestamp - interaction.createdTimestamp;
+        await interaction.reply({ content: 'Pong! 🏓' });
+        const sent = await interaction.fetchReply();
+
+        const latency = Math.max(0, sent.createdTimestamp - interaction.createdTimestamp);
         const apiLatency = Math.round(interaction.client.ws.ping);
-        
-        await interaction.editReply(`🏓 Pong!\n📡 Latence: ${latency}ms\n💓 API: ${apiLatency}ms`);
+        const apiLatencyLabel = apiLatency >= 0 ? `${apiLatency}ms` : 'indisponible (juste après connexion)';
+
+        await interaction.editReply(`🏓 Pong!\n📡 Latence: ${latency}ms\n💓 API: ${apiLatencyLabel}\n🟢 État : en ligne`);
     },
 };

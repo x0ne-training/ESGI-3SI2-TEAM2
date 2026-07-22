@@ -1,10 +1,6 @@
-const { SlashCommandBuilder, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, ChannelType, MessageFlags } = require('discord.js');
 const Parser = require('rss-parser');
-const fs = require('fs');
-const path = require('path');
-
-// Chemin vers le fichier de configuration RSS
-const RSS_CONFIG_PATH = path.join(__dirname, '..', '..', 'rss-config.json');
+const { readRssConfig, writeRssConfig } = require('../../services/rssConfigStore');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -36,7 +32,7 @@ module.exports = {
         if (!interaction.member.permissions.has('Administrator')) {
             return await interaction.reply({
                 content: 'Vous devez être administrateur pour configurer les flux RSS.',
-                flags: 64
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -53,10 +49,7 @@ module.exports = {
             
             // Charger la configuration existante ou créer une nouvelle
             let rssConfig = {};
-            if (fs.existsSync(RSS_CONFIG_PATH)) {
-                const configData = fs.readFileSync(RSS_CONFIG_PATH, 'utf8');
-                rssConfig = JSON.parse(configData);
-            }
+            rssConfig = readRssConfig();
 
             // Initialiser la configuration du serveur si elle n'existe pas
             if (!rssConfig[interaction.guildId]) {
@@ -79,7 +72,7 @@ module.exports = {
             };
 
             // Sauvegarder la configuration
-            fs.writeFileSync(RSS_CONFIG_PATH, JSON.stringify(rssConfig, null, 2));
+            writeRssConfig(rssConfig);
 
             // Répondre avec succès
             await interaction.editReply({

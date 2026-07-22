@@ -1,9 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-// Chemin vers le fichier de configuration RSS
-const RSS_CONFIG_PATH = path.join(__dirname, '..', '..', 'rss-config.json');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { readRssConfig, writeRssConfig } = require('../../services/rssConfigStore');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -14,22 +10,21 @@ module.exports = {
     async execute(interaction) {
         try {
             // Charger la configuration RSS
-            if (!fs.existsSync(RSS_CONFIG_PATH)) {
+            if (Object.keys(readRssConfig()).length === 0) {
                 return await interaction.reply({
                     content: 'Aucun flux RSS n\'est configuré sur ce serveur.\n\nUtilisez `/rss-setup` pour en configurer un.',
-                    flags: 64
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
-            const configData = fs.readFileSync(RSS_CONFIG_PATH, 'utf8');
-            const rssConfig = JSON.parse(configData);
+            const rssConfig = readRssConfig();
 
             // Vérifier s'il y a des flux pour ce serveur
             const guildFeeds = rssConfig[interaction.guildId];
             if (!guildFeeds || Object.keys(guildFeeds).length === 0) {
                 return await interaction.reply({
                     content: 'Aucun flux RSS n\'est configuré sur ce serveur.\n\nUtilisez `/rss-setup` pour en configurer un.',
-                    flags: 64
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -65,7 +60,7 @@ module.exports = {
             console.error('Erreur lors de l\'affichage des flux RSS:', error);
             await interaction.reply({
                 content: 'Une erreur s\'est produite lors de l\'affichage des flux RSS.',
-                flags: 64
+                flags: MessageFlags.Ephemeral
             });
         }
     },
