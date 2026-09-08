@@ -123,3 +123,11 @@ data/*
 # Sauvegardes créées par scripts/migrate-data-v2.js : elles contiennent
 # les données réelles du bot, elles ne doivent jamais être versionnées.
 data-backups/
+
+# Semgrep Guardian : état local de la machine (identifiant anonyme, méthode
+# d'authentification, date d'expiration). Régénéré à chaque connexion, il
+# produit des diffs parasites et n'a rien à faire dans le dépôt.
+# Volontairement ciblé : d'éventuelles règles Semgrep du projet
+# (.semgrep/*.yaml) restent, elles, versionnables.
+.semgrep/guardian.yml
+.semgrep/guardian.yml.lock
