@@ -4,6 +4,9 @@ const devoirsService = require('../../services/devoirsService')
 const categoriesService = require('../../services/categoriesService')
 const { isFeatureEnabled } = require('../../services/guildConfig')
 
+const { createLogger } = require('../../utils/logger');
+
+const log = createLogger('commands');
 const { IMPORTANCE_LABELS } = devoirsService
 
 module.exports = {
@@ -32,7 +35,7 @@ module.exports = {
 
     const moved = devoirsService.movePastDevoirsToArchive(guildId)
     if (moved > 0) {
-      console.log(`Archivage : ${moved} devoir(s) déplacé(s) vers l’archive.`)
+      log.info(`Archivage : ${moved} devoir(s) déplacé(s) vers l’archive.`)
     }
 
     const archived = devoirsService.listArchived(guildId)
@@ -55,7 +58,7 @@ module.exports = {
 
         return (
           `**${i + 1}.** ${subject}\n` +
-          `🗂️ ${categoriesService.formatCategory(category)} — 📅 ${d.date} — 📍 ${impLabel}\n` +
+          `🗂️ ${categoriesService.formatCategory(category)} — 📅 ${devoirsService.formatEcheance(d)} — 📍 ${impLabel}\n` +
           (d.description ? `📝 ${d.description}\n` : '') +
           '​'
         )

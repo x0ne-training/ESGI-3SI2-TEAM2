@@ -40,7 +40,7 @@ GUILD_ID=votre_guild_id_ici
 | `CLIENT_ID` | pour le déploiement | Application ID |
 | `GUILD_ID` | non | Si défini, les commandes slash sont déployées sur ce seul serveur (immédiat, pratique en développement). Sinon, déploiement global (jusqu'à 1 h de propagation). |
 | `RSS_INTERVAL_MS` | non | Intervalle de vérification des flux RSS (défaut : 5 min) |
-| `LOG_LEVEL` | non | Mettre `debug` pour les logs détaillés |
+| `LOG_LEVEL` | non | Verbosité : `error`, `warn`, `info` (défaut), `debug`, `silent` |
 | `BOT_DATA_DIR` | non | Redirige tout le stockage vers un autre dossier. Utilisé par les tests — **à ne pas définir en production**. |
 
 ### Configuration Discord
@@ -76,7 +76,8 @@ créés automatiquement. Le dossier hôte doit être inscriptible par l'UID 1000
 ## Fonctionnalités
 
 - **Dates importantes / devoirs** : ajout, modification, suppression,
-  archivage automatique, priorités, matière et heure facultative.
+  archivage automatique, priorités, matière, et heure limite facultative
+  (**minuit par défaut**).
 - **Tableau des dates importantes** : message auto-actualisé dans un salon
   dédié, regroupé par mois, avec comptes à rebours Discord vivants.
 - **Rappels** : J-7, J-1, timings personnalisés (par serveur ou par devoir),
@@ -199,6 +200,35 @@ node scripts/migrate-data-v2.js --guild-id <DISCORD_GUILD_ID>
 La migration crée une sauvegarde complète dans `data-backups/migration-<date>/`
 (jamais écrasée), valide les données relues, est idempotente, et **ne supprime
 jamais les anciens fichiers**.
+
+## Logs
+
+Le bot écrit ses logs sur la sortie standard, une ligne par événement :
+
+```
+2026-09-08 10:23:45  INFO  [bot] 27 commande(s) chargée(s).
+2026-09-08 10:24:02  INFO  [interactions] /ping — arthus dans 3SIB (48ms)
+2026-09-08 10:24:19  WARN  [rssRunner] Salon indisponible pour le flux Actus
+2026-09-08 10:25:01  ERROR [DevoirBoard] Envoi impossible: Missing Permissions
+```
+
+`error` et `warn` partent sur `stderr`, `info` et `debug` sur `stdout`.
+
+| `LOG_LEVEL` | Ce qui s'affiche |
+|---|---|
+| `silent` | rien |
+| `error` | erreurs uniquement |
+| `warn` | + avertissements |
+| `info` | **(défaut)** + démarrage, commandes exécutées, rappels envoyés |
+| `debug` | + détail par module et stack traces complètes |
+
+```bash
+docker compose logs -f --tail 100          # suivre
+docker compose logs | grep 'ERROR'         # erreurs seulement
+docker compose logs | grep '\[rssRunner\]'  # un module
+```
+
+La rotation est configurée dans `docker-compose.yml` (3 fichiers de 10 Mo).
 
 ## Tests
 

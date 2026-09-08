@@ -34,7 +34,7 @@ function formatSubject(devoir) {
 }
 
 function formatEcheance(devoir) {
-  return devoir.heure ? `${devoir.date} à ${devoir.heure}` : devoir.date;
+  return devoirsService.formatEcheance(devoir);
 }
 
 function categoryLabel(guildId, devoir) {
@@ -199,7 +199,8 @@ function buildAddDevoirModal(guild) {
       .setStyle(TextInputStyle.Short).setMaxLength(devoirsService.MATIERE_MAX_LENGTH).setRequired(false),
     new TextInputBuilder().setCustomId('titre').setLabel('Nom de la tâche (ex : TP RSA)')
       .setStyle(TextInputStyle.Short).setMaxLength(devoirsService.TITRE_MAX_LENGTH).setRequired(true),
-    new TextInputBuilder().setCustomId('date').setLabel('Date limite (AAAA-MM-JJ)')
+    new TextInputBuilder().setCustomId('date').setLabel('Date limite (AAAA-MM-JJ [HH:mm])')
+      .setPlaceholder('2026-09-12  ou  2026-09-12 14:30 — sans heure : minuit')
       .setStyle(TextInputStyle.Short).setRequired(true),
     new TextInputBuilder().setCustomId('categorie').setLabel('Catégorie (nom exact)')
       .setPlaceholder(fallback ? fallback.name : 'Devoir')
@@ -300,7 +301,7 @@ function buildEditFieldsModal(devoir) {
       .setValue(devoir.titre || '').setRequired(true),
     new TextInputBuilder().setCustomId('date').setLabel('Date limite (AAAA-MM-JJ)')
       .setStyle(TextInputStyle.Short).setValue(devoir.date || '').setRequired(true),
-    new TextInputBuilder().setCustomId('heure').setLabel('Heure limite (HH:mm, vide = aucune)')
+    new TextInputBuilder().setCustomId('heure').setLabel('Heure limite (HH:mm, vide = minuit)')
       .setStyle(TextInputStyle.Short).setValue(devoir.heure || '').setRequired(false),
     new TextInputBuilder().setCustomId('description').setLabel('Description')
       .setStyle(TextInputStyle.Paragraph).setMaxLength(devoirsService.DESCRIPTION_MAX_LENGTH)
@@ -504,12 +505,17 @@ async function route(interaction, parts) {
   // --- Modals --------------------------------------------------------------
   if (interaction.isModalSubmit()) {
     if (action === 'add' && sub === 'submit') {
+      // Un modal Discord est limité à 5 champs : la date porte donc aussi
+      // l'heure facultative ("2026-09-12 14:30").
+      const saisie = devoirsService.parseDateTimeInput(interaction.fields.getTextInputValue('date'));
+
       const result = devoirsService.addDevoir({
         guildId,
         channelId: interaction.channelId,
         matiere: interaction.fields.getTextInputValue('matiere'),
         titre: interaction.fields.getTextInputValue('titre'),
-        date: interaction.fields.getTextInputValue('date'),
+        date: saisie.date,
+        heure: saisie.heure,
         categoryRef: interaction.fields.getTextInputValue('categorie'),
         description: interaction.fields.getTextInputValue('description'),
         importance: 'important',

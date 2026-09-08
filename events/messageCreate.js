@@ -3,6 +3,9 @@ const statsStore = require('../services/statsStore');
 const feurEngine = require('../services/feurEngine');
 const { isFeatureEnabled } = require('../services/guildConfig');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('messages');
 module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
@@ -29,7 +32,7 @@ module.exports = {
         allowedMentions: { parse: [] },
       });
     } catch (error) {
-      console.error('Erreur lors de l\'envoi de la réponse feur :', error.message);
+      log.error('Erreur lors de l\'envoi de la réponse feur :', error.message);
     }
   },
 };

@@ -148,12 +148,84 @@ test('beaucoup de devoirs : limites Discord respectées, AUCUN devoir tronqué',
   assert.ok(fullText(messages).includes('(suite)'), 'les mois découpés sont annotés');
 });
 
-test('un devoir avec heure utilise cette heure dans le timestamp', () => {
+test('le timestamp affiché est l’échéance réelle, minuit par défaut', () => {
   const avecHeure = devoir({ date: '2026-09-12', heure: '14:30' });
   const sansHeure = devoir({ date: '2026-09-12' });
 
   assert.equal(devoirsService.getDisplayDate(avecHeure).getHours(), 14);
   assert.equal(devoirsService.getDisplayDate(avecHeure).getMinutes(), 30);
-  // Sans heure, on vise la fin de journée pour que "<t:...:R>" reste positif le jour J.
-  assert.equal(devoirsService.getDisplayDate(sansHeure).getHours(), 23);
+
+  // Sans heure saisie : minuit (début du jour de l'échéance).
+  assert.equal(devoirsService.getDisplayDate(sansHeure).getHours(), 0);
+  assert.equal(devoirsService.getDisplayDate(sansHeure).getMinutes(), 0);
+
+  // Le tableau et les rappels partagent exactement la même échéance.
+  for (const d of [avecHeure, sansHeure]) {
+    assert.equal(devoirsService.getDisplayDate(d).getTime(), devoirsService.getDeadline(d).getTime());
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Jour J : un devoir reste listé toute la journée, même heure passée
+// ---------------------------------------------------------------------------
+
+/** Date AAAA-MM-JJ décalée de N jours. */
+function dateInDays(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+test('échéance du jour : « aujourd’hui » au lieu d’un compte à rebours négatif', () => {
+  // 15h00 : les deux premiers ont leur heure passée, le troisième non.
+  const maintenant = new Date();
+  maintenant.setHours(15, 0, 0, 0);
+
+  const items = [
+    devoir({ titre: 'Minuit', date: dateInDays(0) }),               // 00:00 (défaut)
+    devoir({ titre: 'Ce matin', date: dateInDays(0), heure: '08:00' }),
+    devoir({ titre: 'Ce soir', date: dateInDays(0), heure: '23:00' }),
+  ];
+
+  const text = fullText(board.buildBoardMessages(items, maintenant));
+
+  // Les trois sont présents...
+  for (const titre of ['Minuit', 'Ce matin', 'Ce soir']) {
+    assert.ok(text.includes(`→ ${titre}`), `${titre} doit rester affiché`);
+  }
+
+  // ...et aucun n'affiche de compte à rebours (qui serait négatif pour deux d'entre eux).
+  assert.equal((text.match(/\*\*aujourd’hui\*\*/g) || []).length, 3);
+  assert.ok(!text.includes(':R>'), 'aucun compte à rebours pour les échéances du jour');
+
+  // La date reste affichée normalement.
+  assert.match(text, /- <t:\d+:d> \(soit \*\*aujourd’hui\*\*\) : \*\*Cryptographie\*\* → Minuit/);
+});
+
+test('les échéances futures gardent le compte à rebours Discord vivant', () => {
+  const maintenant = new Date();
+  const items = [
+    devoir({ titre: 'Demain', date: dateInDays(1) }),
+    devoir({ titre: 'Semaine prochaine', date: dateInDays(7) }),
+  ];
+
+  const text = fullText(board.buildBoardMessages(items, maintenant));
+
+  assert.equal((text.match(/:R>/g) || []).length, 2, 'les deux gardent <t:...:R>');
+  assert.ok(!text.includes('aujourd’hui'));
+});
+
+test('« aujourd’hui » reste exact toute la journée (texte figé mais stable)', () => {
+  const item = devoir({ titre: 'Aujourd’hui', date: dateInDays(0), heure: '08:00' });
+
+  // Le tableau est reconstruit peu après minuit ; le rendu doit rester
+  // identique quelle que soit l'heure de consultation dans la journée.
+  const rendus = [0, 8, 15, 23].map(h => {
+    const t = new Date();
+    t.setHours(h, 30, 0, 0);
+    return fullText(board.buildBoardMessages([item], t));
+  });
+
+  assert.equal(new Set(rendus).size, 1, 'le rendu ne dépend pas de l’heure de consultation');
+  assert.ok(rendus[0].includes('**aujourd’hui**'));
 });

@@ -22,6 +22,9 @@ const {
   listGuildIds,
   normalizeGuildId,
 } = require('./guildStore');
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('remindersStore');
 
 const EMPTY = () => ({ version: 2, reminders: [] });
 
@@ -81,7 +84,7 @@ function addMany(guildId, reminders) {
     const created = list.map(r => decorate({ ...r, guildId: null }));
     orphans.reminders.push(...created);
     writeOrphans(orphans);
-    console.warn(`[remindersStore] ${created.length} rappel(s) sans guild valide mis en attente (orphelins).`);
+    log.warn(`${created.length} rappel(s) sans guild valide mis en attente (orphelins).`);
     return created;
   }
 

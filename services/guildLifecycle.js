@@ -5,6 +5,9 @@ const { ensureGuildDir, normalizeGuildId, ensureSchemaVersion, guildExists } = r
 const { ensureGuildConfig } = require('./guildConfig');
 const categoriesService = require('./categoriesService');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('guildLifecycle');
 /**
  * Crée (si besoin) data/guilds/<guildId>/ avec sa configuration par défaut et
  * ses catégories par défaut. Idempotent : ne réécrit rien si tout existe déjà.
@@ -20,7 +23,7 @@ function ensureGuildInitialized(guildId) {
   ensureGuildConfig(id);
   categoriesService.listCategories(id); // crée les catégories par défaut au besoin
 
-  if (isNew) console.log(`🗂️ Données initialisées pour le serveur ${id}.`);
+  if (isNew) log.info(`🗂️ Données initialisées pour le serveur ${id}.`);
   return true;
 }
 

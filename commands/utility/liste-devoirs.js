@@ -71,7 +71,7 @@ module.exports = {
         const category = devoirsService.getDevoirCategory(guildId, d)
         const impLabel = IMPORTANCE_LABELS[d.importance] || 'Important'
         const subject = d.matiere ? `**${d.matiere}** → ${d.titre}` : `**${d.titre}**`
-        const echeance = d.heure ? `${d.date} à ${d.heure}` : d.date
+        const echeance = devoirsService.formatEcheance(d)
 
         return (
           `**${i + 1}.** ${subject}\n` +

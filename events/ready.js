@@ -10,14 +10,17 @@ const { startCooldownCleanup } = require('../services/feurEngine');
 const { ensureAllGuildsInitialized } = require('../services/guildLifecycle');
 const { getSchemaVersion, SCHEMA_VERSION } = require('../services/guildStore');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('bot');
 let started = false;
 
 module.exports = {
   name: Events.ClientReady,
   once: true,
   execute(client) {
-    console.log(`✅ Bot connecté en tant que ${client.user.tag}!`);
-    console.log(`🚀 Bot actif sur ${client.guilds.cache.size} serveur(s)`);
+    log.info(`✅ Bot connecté en tant que ${client.user.tag}!`);
+    log.info(`🚀 Bot actif sur ${client.guilds.cache.size} serveur(s)`);
 
     client.user.setActivity('3SIB Server', { type: 3 }); // WATCHING
 
@@ -29,19 +32,19 @@ module.exports = {
 
     // Prépare data/guilds/<guildId>/ pour chaque serveur connu (idempotent).
     const initialized = ensureAllGuildsInitialized(client);
-    console.log(`🗂️ Données prêtes pour ${initialized} serveur(s) — schéma v${getSchemaVersion()}.`);
+    log.info(`🗂️ Données prêtes pour ${initialized} serveur(s) — schéma v${getSchemaVersion()}.`);
 
     const schemaVersion = getSchemaVersion();
     if (schemaVersion < SCHEMA_VERSION) {
-      console.warn(
-        `⚠️ Schéma de données v${schemaVersion} détecté (attendu v${SCHEMA_VERSION}). ` +
+      log.warn(
+        `Schéma de données v${schemaVersion} détecté (attendu v${SCHEMA_VERSION}). ` +
         'Lance `node scripts/migrate-data-v2.js --dry-run` puis la migration réelle.',
       );
     }
 
     // Recalcule les rappels persistants de chaque serveur
     const { devoirsCount, createdCount } = devoirsService.rebuildAllReminders();
-    console.log(`✅ Reminders JSON rebuild: ${createdCount} rappel(s) pending créé(s) pour ${devoirsCount} élément(s).`);
+    log.info(`✅ Reminders JSON rebuild: ${createdCount} rappel(s) pending créé(s) pour ${devoirsCount} élément(s).`);
 
     // Runner persistant (salons + DM)
     startRemindersRunner(client, { intervalMs: 30_000 });

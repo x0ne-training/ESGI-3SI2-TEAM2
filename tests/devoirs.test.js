@@ -251,3 +251,127 @@ test('les rappels d’un serveur ne sont jamais annulés depuis un autre', () =>
   assert.equal(remindersStore.cancelByDevoirId(GUILD_A, cible.id), 0);
   assert.equal(pending(GUILD_B, cible.id).length, avant, 'rappels de B intacts');
 });
+
+// ---------------------------------------------------------------------------
+// Heure d'échéance (défaut : minuit)
+// ---------------------------------------------------------------------------
+
+test('l’heure vaut minuit par défaut, sans être écrite en base', () => {
+  const created = devoirsService.addDevoir({
+    guildId: GUILD_A, channelId: CHANNEL_A, matiere: 'Histoire', titre: 'Sans heure',
+    date: inDays(12), categoryRef: categoriesService.getFallbackCategory(GUILD_A).id,
+  });
+  assert.equal(created.ok, true, created.error);
+
+  // Rien n'est écrit : les devoirs hérités (heure absente) restent intacts.
+  assert.equal(created.devoir.heure, null, 'heure non stockée');
+
+  // Mais l'heure effective est bien minuit.
+  assert.equal(devoirsService.getEffectiveHeure(created.devoir), '00:00');
+  assert.equal(devoirsService.getDeadline(created.devoir).getHours(), 0);
+  assert.equal(devoirsService.getDeadline(created.devoir).getMinutes(), 0);
+  assert.equal(devoirsService.formatEcheance(created.devoir), `${inDays(12)} à 00:00`);
+});
+
+test('une heure explicite est conservée et utilisée', () => {
+  const created = devoirsService.addDevoir({
+    guildId: GUILD_A, channelId: CHANNEL_A, titre: 'Avec heure', date: inDays(13), heure: '17:45',
+    categoryRef: categoriesService.getFallbackCategory(GUILD_A).id,
+  });
+  assert.equal(created.ok, true, created.error);
+
+  assert.equal(created.devoir.heure, '17:45');
+  assert.equal(devoirsService.getEffectiveHeure(created.devoir), '17:45');
+  assert.equal(devoirsService.getDeadline(created.devoir).getHours(), 17);
+  assert.equal(devoirsService.formatEcheance(created.devoir), `${inDays(13)} à 17:45`);
+});
+
+test('un devoir hérité (heure absente) est traité comme minuit sans réécriture', () => {
+  const devoirs = devoirsService.readDevoirs(GUILD_A);
+  devoirs.push({
+    id: 'hw_legacy_heure', guildId: GUILD_A, channelId: CHANNEL_A,
+    titre: 'Devoir v1', date: inDays(14),
+    categoryId: categoriesService.getFallbackCategory(GUILD_A).id,
+    type: 'devoir', importance: 'important', customTimings: [],
+    // pas de champ `heure` du tout, comme dans les données du schéma v1
+  });
+  devoirsService.writeDevoirs(GUILD_A, devoirs);
+
+  const relu = devoirsService.readDevoirs(GUILD_A).find(d => d.id === 'hw_legacy_heure');
+  assert.equal(relu.heure, null, 'toujours pas d’heure en base');
+  assert.equal(devoirsService.getEffectiveHeure(relu), '00:00');
+  assert.equal(devoirsService.getDeadline(relu).getHours(), 0);
+});
+
+test('vider l’heure d’un devoir le ramène à minuit', () => {
+  const created = devoirsService.addDevoir({
+    guildId: GUILD_A, channelId: CHANNEL_A, titre: 'Heure retirée', date: inDays(15), heure: '09:15',
+    categoryRef: categoriesService.getFallbackCategory(GUILD_A).id,
+  });
+
+  const updated = devoirsService.updateDevoir(GUILD_A, created.devoir.id, { heure: '' });
+
+  assert.equal(updated.ok, true, updated.error);
+  assert.equal(updated.devoir.heure, null);
+  assert.equal(devoirsService.getEffectiveHeure(updated.devoir), '00:00');
+});
+
+test('une heure invalide est refusée', () => {
+  const base = {
+    guildId: GUILD_A, channelId: CHANNEL_A, titre: 'X', date: inDays(16),
+    categoryRef: categoriesService.getFallbackCategory(GUILD_A).id,
+  };
+
+  for (const heure of ['25:00', '12:75', '9:30', '14h30', 'midi']) {
+    const result = devoirsService.addDevoir({ ...base, heure });
+    assert.equal(result.ok, false, `"${heure}" aurait dû être refusée`);
+  }
+});
+
+test('parseDateTimeInput découpe la saisie des modals', () => {
+  assert.deepEqual(devoirsService.parseDateTimeInput('2026-09-12'), { date: '2026-09-12', heure: null });
+  assert.deepEqual(devoirsService.parseDateTimeInput('2026-09-12 14:30'), { date: '2026-09-12', heure: '14:30' });
+  assert.deepEqual(devoirsService.parseDateTimeInput('  2026-09-12   08:05 '), { date: '2026-09-12', heure: '08:05' });
+});
+
+test('l’heure décale bien les rappels personnalisés', () => {
+  const categorie = categoriesService.getFallbackCategory(GUILD_A).id;
+
+  const minuit = devoirsService.addDevoir({
+    guildId: GUILD_A, channelId: CHANNEL_A, titre: 'Minuit', date: inDays(20),
+    categoryRef: categorie, timingsStr: '2j',
+  });
+  const soir = devoirsService.addDevoir({
+    guildId: GUILD_A, channelId: CHANNEL_A, titre: 'Soir', date: inDays(20), heure: '18:00',
+    categoryRef: categorie, timingsStr: '2j',
+  });
+
+  const custom = (r) => r.remindersCreated.find(x => x.kind.startsWith('custom-'));
+  const ecart = new Date(custom(soir).remindAtISO) - new Date(custom(minuit).remindAtISO);
+
+  assert.equal(ecart, 18 * 60 * 60 * 1000, 'le rappel "2j" suit l’heure de l’échéance');
+});
+
+test('un devoir du jour reste listé même quand son heure est passée', () => {
+  const guild = '800000000000000008';
+  const categorie = categoriesService.getFallbackCategory(guild).id;
+
+  for (const [titre, heure] of [['Minuit', null], ['Ce matin', '08:00'], ['Ce soir', '23:59']]) {
+    const r = devoirsService.addDevoir({
+      guildId: guild, channelId: CHANNEL_A, matiere: 'Test', titre,
+      date: inDays(0), heure, categoryRef: categorie,
+    });
+    assert.equal(r.ok, true, r.error);
+  }
+
+  const upcoming = devoirsService.getUpcoming(guild);
+  assert.deepEqual(upcoming.map(d => d.titre), ['Minuit', 'Ce matin', 'Ce soir']);
+
+  // Certaines échéances sont déjà dépassées : elles restent quand même listées.
+  const passees = upcoming.filter(d => devoirsService.getDeadline(d) < new Date());
+  assert.ok(passees.length >= 1, 'au moins une échéance du jour est déjà passée');
+
+  // Et l'archivage ne les emporte pas : il se déclenche le lendemain.
+  assert.equal(devoirsService.movePastDevoirsToArchive(guild), 0);
+  assert.equal(devoirsService.getUpcoming(guild).length, 3);
+});

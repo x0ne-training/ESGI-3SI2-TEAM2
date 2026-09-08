@@ -47,7 +47,7 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('heure')
-        .setDescription('Heure limite (format HH:mm, facultatif)')
+        .setDescription('Heure limite (HH:mm). Par défaut : minuit.')
         .setRequired(false)
     )
     .addStringOption(option =>
@@ -125,7 +125,7 @@ module.exports = {
         { name: '📍 Importance', value: IMPORTANCE_LABELS[devoir.importance] || 'Important', inline: true },
         {
           name: '📅 Date limite',
-          value: devoir.heure ? `${devoir.date} à ${devoir.heure}` : devoir.date,
+          value: devoirsService.formatEcheance(devoir),
           inline: true
         },
         { name: '🗂️ Catégorie', value: categoriesService.formatCategory(category), inline: true },

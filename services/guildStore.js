@@ -25,6 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const { createLogger } = require('../utils/logger');
 const {
   DATA_DIR,
   ensureDir,
@@ -32,6 +33,8 @@ const {
   writeJsonAt,
   structuredCloneSafe,
 } = require('./dataStore');
+
+const log = createLogger('guildStore');
 
 const GUILDS_DIR = path.join(DATA_DIR, 'guilds');
 const GLOBAL_DIR = path.join(DATA_DIR, 'global');
@@ -103,7 +106,7 @@ function ensureGuildDir(guildId) {
 function readGuildJson(guildId, fileName, fallback) {
   const filePath = getGuildDataPath(guildId, fileName);
   if (!filePath) {
-    console.error(`[guildStore] Lecture refusée : guildId invalide (${guildId}) pour ${fileName}.`);
+    log.error(`Lecture refusée : guildId invalide (${guildId}) pour ${fileName}.`);
     return structuredCloneSafe(fallback);
   }
   return readJsonAt(filePath, fallback);
@@ -113,7 +116,7 @@ function readGuildJson(guildId, fileName, fallback) {
 function writeGuildJson(guildId, fileName, data) {
   const filePath = getGuildDataPath(guildId, fileName);
   if (!filePath) {
-    console.error(`[guildStore] Écriture refusée : guildId invalide (${guildId}) pour ${fileName}.`);
+    log.error(`Écriture refusée : guildId invalide (${guildId}) pour ${fileName}.`);
     return false;
   }
   return writeJsonAt(filePath, data);
@@ -143,7 +146,7 @@ function listGuildIds() {
       .filter(entry => entry.isDirectory() && isValidGuildId(entry.name))
       .map(entry => entry.name);
   } catch (e) {
-    console.error('[guildStore] Impossible de lister les serveurs:', e.message);
+    log.error('Impossible de lister les serveurs:', e.message);
     return [];
   }
 }

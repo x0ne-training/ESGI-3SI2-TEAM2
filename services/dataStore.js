@@ -8,6 +8,9 @@
 const fs = require('fs');
 const path = require('path');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('dataStore');
 // BOT_DATA_DIR permet de rediriger tout le stockage ailleurs (tests isolés,
 // montage Docker non standard). Par défaut : <racine du projet>/data.
 const DATA_DIR = process.env.BOT_DATA_DIR
@@ -37,12 +40,12 @@ function quarantineCorrupt(filePath, reason) {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const target = `${filePath}.corrupt-${stamp}`;
     fs.renameSync(filePath, target);
-    console.error(
-      `[dataStore] ${path.basename(filePath)} illisible (${reason}). ` +
+    log.error(
+      `${path.basename(filePath)} illisible (${reason}). ` +
       `Conservé sous ${path.basename(target)}, valeurs par défaut utilisées.`,
     );
   } catch (e) {
-    console.error(`[dataStore] Impossible de mettre en quarantaine ${filePath}:`, e.message);
+    log.error(`Impossible de mettre en quarantaine ${filePath}:`, e.message);
   }
 }
 
@@ -57,7 +60,7 @@ function readJsonAt(filePath, fallback) {
   try {
     raw = fs.readFileSync(filePath, 'utf-8');
   } catch (e) {
-    console.error(`[dataStore] Erreur lecture ${filePath}:`, e.message);
+    log.error(`Erreur lecture ${filePath}:`, e.message);
     return structuredCloneSafe(fallback);
   }
 
@@ -88,7 +91,7 @@ function writeJsonAt(filePath, data) {
     fs.renameSync(tmpPath, filePath);
     return true;
   } catch (e) {
-    console.error(`[dataStore] Erreur écriture ${filePath}:`, e.message);
+    log.error(`Erreur écriture ${filePath}:`, e.message);
     try { fs.unlinkSync(tmpPath); } catch { /* tmp déjà absent */ }
     return false;
   }

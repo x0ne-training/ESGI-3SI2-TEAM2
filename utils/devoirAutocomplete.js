@@ -15,7 +15,7 @@ function formatChoiceName(devoir, guildId, index) {
   const category = devoirsService.getDevoirCategory(guildId, devoir);
   const categoryLabel = category ? categoriesService.formatCategory(category) : 'Sans catégorie';
   const subject = devoir.matiere ? `${devoir.matiere} — ${devoir.titre}` : devoir.titre;
-  const echeance = devoir.heure ? `${devoir.date} ${devoir.heure}` : devoir.date;
+  const echeance = devoirsService.formatEcheance(devoir);
 
   return `${index + 1}. [${categoryLabel}] ${subject} (${echeance})`.slice(0, 100);
 }

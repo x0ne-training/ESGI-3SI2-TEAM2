@@ -33,6 +33,11 @@ const IMPORTANCE_LABELS = {
 };
 const VALID_IMPORTANCES = Object.keys(IMPORTANCE_LABELS);
 
+// Heure appliquée quand aucune n'est saisie. Les devoirs héritant du schéma v1
+// gardent `heure: null` en base : le défaut est résolu À LA LECTURE, on ne
+// réécrit jamais les données existantes.
+const DEFAULT_HEURE = '00:00';
+
 const TITRE_MAX_LENGTH = 100;
 const MATIERE_MAX_LENGTH = 60;
 const DESCRIPTION_MAX_LENGTH = 1000;
@@ -140,32 +145,53 @@ function writeConfig(cfg) {
 // ---------------------------------------------------------------------------
 
 /**
- * Échéance servant aux rappels, au tri et à l'archivage.
- * Sans heure explicite : minuit (comportement historique conservé, pour ne pas
- * décaler les rappels personnalisés déjà planifiés).
+ * Heure effective d'un devoir : celle qui a été saisie, ou minuit par défaut.
+ * `heure: null` en base signifie donc "00:00", sans qu'on ait à réécrire les
+ * anciens devoirs.
+ */
+function getEffectiveHeure(devoir) {
+  const heure = devoir && typeof devoir.heure === 'string' ? devoir.heure.trim() : '';
+  return /^\d{2}:\d{2}$/.test(heure) ? heure : DEFAULT_HEURE;
+}
+
+/**
+ * Échéance d'un devoir : sa date à son heure effective.
+ * Sert aux rappels, au tri, à l'archivage ET à l'affichage — une seule
+ * définition, pour que le tableau ne puisse pas diverger de la logique métier.
  */
 function getDeadline(devoir) {
   if (!devoir) return null;
-  if (devoir.heure) {
-    const withTime = parseDateTimeLocal(devoir.date, devoir.heure);
-    if (withTime) return withTime;
-  }
+
+  const withTime = parseDateTimeLocal(devoir.date, getEffectiveHeure(devoir));
+  if (withTime) return withTime;
+
+  // Repli si la date est lisible mais l'heure inexploitable.
   return parseDateYYYYMMDD(devoir.date);
 }
 
 /**
- * Horodatage utilisé pour l'AFFICHAGE (tableau, embeds).
- * Sans heure explicite, on vise la fin de journée : le compte à rebours
- * Discord affiche alors "dans 6 heures" le jour J au lieu de "il y a 9 heures".
+ * Horodatage utilisé pour l'affichage (tableau, embeds).
+ * Identique à l'échéance : ce que voit l'étudiant est exactement la date
+ * limite utilisée par les rappels.
  */
 function getDisplayDate(devoir) {
-  if (!devoir) return null;
-  if (devoir.heure) return getDeadline(devoir);
+  return getDeadline(devoir);
+}
 
-  const day = parseDateYYYYMMDD(devoir.date);
-  if (!day) return null;
-  day.setHours(23, 59, 0, 0);
-  return day;
+/**
+ * Découpe une saisie libre "AAAA-MM-JJ" ou "AAAA-MM-JJ HH:mm" en ses deux
+ * parties. Sert aux modals Discord, limités à 5 champs : on ne peut pas y
+ * offrir une ligne séparée pour l'heure.
+ */
+function parseDateTimeInput(input) {
+  const parts = String(input || '').trim().split(/\s+/);
+  return { date: parts[0] || '', heure: parts[1] || null };
+}
+
+/** "12/09/2026 à 00:00" — rendu texte unique, partagé par toutes les vues. */
+function formatEcheance(devoir) {
+  if (!devoir || !devoir.date) return 'Non définie';
+  return `${devoir.date} à ${getEffectiveHeure(devoir)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +463,8 @@ function validateDate(dateStr) {
 
 function validateHeure(heureStr) {
   const h = String(heureStr || '').trim();
-  if (!h) return { ok: true, value: null }; // l'heure est facultative
+  // Champ vide = on ne stocke rien ; getEffectiveHeure() appliquera minuit.
+  if (!h) return { ok: true, value: null };
   if (!/^\d{2}:\d{2}$/.test(h)) {
     return { ok: false, error: 'Format d’heure invalide. Utilise **HH:mm** (ex : 14:30).' };
   }
@@ -727,6 +754,7 @@ function listArchived(guildId) {
 module.exports = {
   IMPORTANCE_LABELS,
   VALID_IMPORTANCES,
+  DEFAULT_HEURE,
   TITRE_MAX_LENGTH,
   MATIERE_MAX_LENGTH,
   DESCRIPTION_MAX_LENGTH,
@@ -745,6 +773,9 @@ module.exports = {
 
   getDeadline,
   getDisplayDate,
+  getEffectiveHeure,
+  formatEcheance,
+  parseDateTimeInput,
   getDevoirCategory,
 
   movePastDevoirsToArchive,

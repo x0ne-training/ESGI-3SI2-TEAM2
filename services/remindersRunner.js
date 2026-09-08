@@ -9,6 +9,9 @@ const { getDevoirsConfig, isFeatureEnabled } = require('./guildConfig');
 const categoriesService = require('./categoriesService');
 const devoirsService = require('./devoirsService');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('remindersRunner');
 const { IMPORTANCE_LABELS } = devoirsService;
 
 /** Libellé de catégorie du rappel, résolu au moment de l'envoi. */
@@ -43,7 +46,7 @@ function getReminderColor(importance, kind) {
 
 function buildDescription(reminder) {
   const subject = formatSubject(reminder);
-  const echeance = reminder.heure ? `${reminder.date} à ${reminder.heure}` : reminder.date;
+  const echeance = devoirsService.formatEcheance(reminder);
 
   if (reminder.kind === '7d') {
     return `${subject} est à rendre dans **7 jours** (le ${echeance}).`;
@@ -65,7 +68,7 @@ function resolveTargetChannelId(cfg, reminder) {
 }
 
 function buildDMEmbed(reminder) {
-  const echeance = reminder.heure ? `${reminder.date} à ${reminder.heure}` : (reminder.date || 'Non définie');
+  const echeance = devoirsService.formatEcheance(reminder);
 
   return new EmbedBuilder()
     .setColor(0x3498db)
@@ -84,18 +87,18 @@ function buildDMEmbed(reminder) {
 
 async function deliverDM(client, reminder) {
   if (!reminder.userId) {
-    console.warn(`⚠️ Rappel DM sans userId (id=${reminder.id})`);
+    log.warn(`Rappel DM sans userId (id=${reminder.id})`);
     return;
   }
 
   const user = await client.users.fetch(reminder.userId).catch(() => null);
   if (!user) {
-    console.warn(`⚠️ Utilisateur introuvable (${reminder.userId}) pour le rappel DM ${reminder.id}`);
+    log.warn(`Utilisateur introuvable (${reminder.userId}) pour le rappel DM ${reminder.id}`);
     return;
   }
 
   await user.send({ embeds: [buildDMEmbed(reminder)] });
-  console.log(`📩 Rappel DM (${reminder.kind}) envoyé à ${user.tag} pour ${reminder.title}`);
+  log.info(`📩 Rappel DM (${reminder.kind}) envoyé à ${user.tag} pour ${reminder.title}`);
 }
 
 async function deliverChannel(client, reminder) {
@@ -103,18 +106,18 @@ async function deliverChannel(client, reminder) {
   const targetChannelId = resolveTargetChannelId(cfg, reminder);
 
   if (!targetChannelId) {
-    console.warn(`⚠️ Rappel sans salon cible (guild=${reminder.guildId}, id=${reminder.id})`);
+    log.warn(`Rappel sans salon cible (guild=${reminder.guildId}, id=${reminder.id})`);
     return;
   }
 
   const channel = await client.channels.fetch(targetChannelId).catch(() => null);
   if (!channel || typeof channel.send !== 'function') {
-    console.warn(`⚠️ Salon introuvable (${targetChannelId}) pour le rappel ${reminder.id}`);
+    log.warn(`Salon introuvable (${targetChannelId}) pour le rappel ${reminder.id}`);
     return;
   }
 
   const importance = reminder.importance || 'important';
-  const echeance = reminder.heure ? `${reminder.date} à ${reminder.heure}` : (reminder.date || 'Non définie');
+  const echeance = devoirsService.formatEcheance(reminder);
 
   const embed = new EmbedBuilder()
     .setColor(getReminderColor(importance, reminder.kind))
@@ -134,17 +137,17 @@ async function deliverChannel(client, reminder) {
     allowedMentions: buildAllowedMentions(cfg),
   });
 
-  console.log(`Rappel (${reminder.kind}) envoyé pour ${reminder.title} dans #${targetChannelId}`);
+  log.info(`Rappel (${reminder.kind}) envoyé pour ${reminder.title} dans #${targetChannelId}`);
 }
 
 function startRemindersRunner(client, { intervalMs = 30_000 } = {}) {
-  console.log(`⏱️ RemindersRunner démarré (interval ${intervalMs}ms)`);
+  log.info(`⏱️ RemindersRunner démarré (interval ${intervalMs}ms)`);
 
   setInterval(() => {
     try {
       cleanupOldSent(30);
     } catch (e) {
-      console.error('cleanupOldSent error:', e.message);
+      log.error('cleanupOldSent error:', e.message);
     }
   }, 6 * 60 * 60 * 1000);
 
@@ -167,13 +170,13 @@ function startRemindersRunner(client, { intervalMs = 30_000 } = {}) {
         } catch (e) {
           // On marque quand même comme envoyé pour ne pas boucler indéfiniment
           // (salon supprimé, DM fermés, permissions retirées...).
-          console.error(`Erreur d'envoi du rappel ${reminder.id}:`, e.message);
+          log.error(`Erreur d'envoi du rappel ${reminder.id}:`, e.message);
         }
 
         markSent(reminder.guildId, reminder.id);
       }
     } catch (err) {
-      console.error('RemindersRunner error:', err);
+      log.error('RemindersRunner error:', err);
     }
   }, intervalMs);
 }

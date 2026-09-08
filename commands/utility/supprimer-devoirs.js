@@ -63,7 +63,7 @@ module.exports = {
       .setTitle('🗑️ Suppression effectuée')
       .setDescription(
         `L'élément suivant a été supprimé :\n\n${subject}\n` +
-          `📅 ${devoir.heure ? `${devoir.date} à ${devoir.heure}` : devoir.date}\n` +
+          `📅 ${devoirsService.formatEcheance(devoir)}\n` +
           `🗂️ ${categoriesService.formatCategory(category)}`
       )
       .addFields({

@@ -20,6 +20,9 @@ const feurPanelHandler = require('./feurPanelHandler');
 const homeworkPanelHandler = require('./homeworkPanelHandler');
 const categoriesPanelHandler = require('./categoriesPanelHandler');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('adminPanel');
 const FEATURE_LABELS = {
   feur: 'Réponses "feur"',
   homework: 'Devoirs',
@@ -175,7 +178,7 @@ async function route(interaction) {
     // customId admin: inconnu / panel expiré -> retour à l'accueil
     return await showMainPanel(interaction);
   } catch (error) {
-    console.error(`[adminPanelHandler] Erreur sur ${customId}:`, error);
+    log.error(`Erreur sur ${customId}:`, error);
     const errorPayload = { content: '❌ Une erreur est survenue. Réessaie ou relance `/admin-panel`.', flags: MessageFlags.Ephemeral };
     try {
       if (interaction.deferred || interaction.replied) {

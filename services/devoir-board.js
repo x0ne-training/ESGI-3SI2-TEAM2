@@ -16,6 +16,10 @@ const devoirsService = require('./devoirsService');
 const { getDevoirsConfig, patchDevoirsConfig, isFeatureEnabled } = require('./guildConfig');
 const { listGuildIds } = require('./guildStore');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('DevoirBoard');
+
 const BOARD_TITLE = '# 📅 DATES IMPORTANTES';
 const EMPTY_MESSAGE = 'Aucune date importante à venir pour le moment.';
 
@@ -42,12 +46,28 @@ function todayKey() {
 // Construction du texte
 // ---------------------------------------------------------------------------
 
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
 /**
  * Une ligne du tableau :
  *   - <t:TS:d> (soit <t:TS:R>) : **MATIÈRE** → NOM DE LA TÂCHE
  * Sans matière renseignée (données héritées), on n'affiche que le nom.
+ * L'horodatage est l'échéance réelle du devoir : son heure, ou minuit
+ * par défaut (voir devoirsService.getEffectiveHeure).
+ *
+ * Cas particulier du jour J : un devoir reste listé jusqu'à son archivage
+ * (le lendemain), même si son heure est passée. On écrit alors « aujourd'hui »
+ * au lieu du compte à rebours Discord, qui afficherait « il y a 3 heures » et
+ * donnerait l'impression que la ligne n'a rien à faire là.
+ *
+ * Ce texte est figé, mais « l'échéance tombe-t-elle aujourd'hui ? » ne change
+ * pas au cours de la journée : il reste donc exact jusqu'au prochain rendu.
  */
-function formatLine(devoir) {
+function formatLine(devoir, now = new Date()) {
   const displayDate = devoirsService.getDisplayDate(devoir);
   if (!displayDate) return null;
 
@@ -56,11 +76,13 @@ function formatLine(devoir) {
   const matiere = String(devoir.matiere || '').trim();
   const subject = matiere ? `**${matiere}** → ${titre}` : `**${titre}**`;
 
-  return `- <t:${ts}:d> (soit <t:${ts}:R>) : ${subject}`;
+  const relative = isSameDay(displayDate, now) ? '**aujourd’hui**' : `<t:${ts}:R>`;
+
+  return `- <t:${ts}:d> (soit ${relative}) : ${subject}`;
 }
 
 /** Regroupe les devoirs (déjà triés chronologiquement) par année puis par mois. */
-function groupByMonth(devoirs) {
+function groupByMonth(devoirs, now = new Date()) {
   const groups = [];
   let current = null;
 
@@ -78,7 +100,7 @@ function groupByMonth(devoirs) {
       groups.push(current);
     }
 
-    const line = formatLine(devoir);
+    const line = formatLine(devoir, now);
     if (line) current.lines.push(line);
   }
 
@@ -137,8 +159,8 @@ function buildDescriptions(groups) {
  * le premier est le message principal, les suivants (rares) ne sont créés
  * que si le tableau dépasse les limites Discord d'un seul message.
  */
-function buildBoardMessages(devoirs) {
-  const groups = groupByMonth(devoirs);
+function buildBoardMessages(devoirs, now = new Date()) {
+  const groups = groupByMonth(devoirs, now);
   const descriptions = buildDescriptions(groups);
 
   const messages = [];
@@ -180,17 +202,29 @@ function buildBoardMessages(devoirs) {
  * Réutilise un message existant quand c'est possible (édition) plutôt que d'en
  * poster un nouveau à chaque actualisation.
  */
+/** Descriptions des embeds d'un message, pour comparer deux rendus. */
+function describe(source) {
+  return (source || []).map(embed => (embed.data ? embed.data.description : embed.description) || '');
+}
+
 async function upsertMessage(channel, messageId, payload) {
   if (messageId) {
     const existing = await channel.messages.fetch(messageId).catch(() => null);
     if (existing && existing.editable) {
+      // Le tableau est vérifié toutes les heures : inutile d'appeler l'API
+      // Discord si le rendu n'a pas bougé. On ne compare que les descriptions,
+      // le pied de page portant un horodatage qui change à chaque construction.
+      const sameContent =
+        JSON.stringify(describe(existing.embeds)) === JSON.stringify(describe(payload.embeds));
+      if (sameContent) return existing.id;
+
       const edited = await existing.edit(payload).catch(() => null);
       if (edited) return edited.id;
     }
   }
 
   const sent = await channel.send(payload).catch(error => {
-    console.error('[DevoirBoard] Envoi impossible:', error.message);
+    log.error('Envoi impossible:', error.message);
     return null;
   });
   return sent ? sent.id : null;
@@ -204,13 +238,13 @@ async function updateGuildBoard(client, guildId) {
 
   const channel = await client.channels.fetch(cfg.boardChannelId).catch(() => null);
   if (!channel || typeof channel.send !== 'function') {
-    console.warn(`[DevoirBoard] Salon du tableau inaccessible pour la guild ${guildId}.`);
+    log.warn(`Salon du tableau inaccessible pour la guild ${guildId}.`);
     return false;
   }
 
   const moved = devoirsService.movePastDevoirsToArchive(guildId);
   if (moved > 0) {
-    console.log(`[DevoirBoard] ${moved} élément(s) archivé(s) avant la mise à jour du tableau.`);
+    log.info(`${moved} élément(s) archivé(s) avant la mise à jour du tableau.`);
   }
 
   const messages = buildBoardMessages(devoirsService.getUpcoming(guildId));
@@ -244,39 +278,42 @@ async function updateGuildBoard(client, guildId) {
   return Boolean(mainMessageId);
 }
 
-/** Met à jour le tableau de tous les serveurs configurés. */
-async function updateAllBoards(client, force = false) {
-  const key = todayKey();
-
+/**
+ * Passe en revue le tableau de tous les serveurs configurés.
+ * Le rendu est reconstruit à chaque passage, mais `upsertMessage` n'édite le
+ * message que si le texte a réellement changé : le contrôle horaire ne coûte
+ * donc rien tant que rien ne bouge. C'est ce qui garantit que la mention
+ * « aujourd'hui » apparaît au plus tard une heure après minuit.
+ */
+async function updateAllBoards(client) {
   for (const guildId of listGuildIds()) {
     const cfg = getDevoirsConfig(guildId);
     if (!cfg.boardChannelId) continue;
-    if (!force && cfg.boardLastUpdate === key) continue;
 
     await updateGuildBoard(client, guildId).catch(e => {
-      console.error(`[DevoirBoard] Erreur de mise à jour pour la guild ${guildId}:`, e.message);
+      log.error(`Erreur de mise à jour pour la guild ${guildId}:`, e.message);
     });
   }
 }
 
 /** Initialise le système du tableau et expose les déclencheurs d'actualisation. */
 function initDevoirBoard(client) {
-  updateAllBoards(client, false).catch(() => null);
+  updateAllBoards(client).catch(() => null);
 
   const timer = setInterval(() => {
-    updateAllBoards(client, false).catch(() => null);
+    updateAllBoards(client).catch(() => null);
   }, 60 * 60 * 1000);
   timer.unref?.();
 
   // Actualisation ciblée d'un seul serveur (après ajout/modif/suppression).
   client.refreshDevoirBoard = (guildId) =>
     updateGuildBoard(client, guildId).catch(e => {
-      console.error(`[DevoirBoard] Actualisation ciblée échouée (${guildId}):`, e.message);
+      log.error(`Actualisation ciblée échouée (${guildId}):`, e.message);
       return false;
     });
 
-  // Actualisation globale forcée (conservée pour la compatibilité).
-  client.forceDevoirBoardUpdate = () => updateAllBoards(client, true);
+  // Actualisation globale (conservée : utilisée par /devoir-salon-liste).
+  client.forceDevoirBoardUpdate = () => updateAllBoards(client);
 }
 
 module.exports = {

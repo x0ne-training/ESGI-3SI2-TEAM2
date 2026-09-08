@@ -4,10 +4,13 @@
 const { Events } = require('discord.js');
 const { ensureGuildInitialized } = require('../services/guildLifecycle');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('guilds');
 module.exports = {
   name: Events.GuildCreate,
   execute(guild) {
     ensureGuildInitialized(guild.id);
-    console.log(`➕ Bot ajouté au serveur ${guild.name} (${guild.id}).`);
+    log.info(`➕ Bot ajouté au serveur ${guild.name} (${guild.id}).`);
   },
 };

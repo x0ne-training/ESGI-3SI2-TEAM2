@@ -32,7 +32,7 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('heure')
-        .setDescription('Nouvelle heure limite (HH:mm, facultatif)')
+        .setDescription('Nouvelle heure limite (HH:mm). Par défaut : minuit.')
         .setRequired(false)
     ),
   emoji: '🗓️',
@@ -60,7 +60,7 @@ module.exports = {
 
     const devoirsBefore = devoirsService.readDevoirs(interaction.guildId)
     const before = devoirsBefore.find(d => devoirsService.sameId(d.id, devoirId))
-    const oldDate = before ? (before.heure ? `${before.date} à ${before.heure}` : before.date) : null
+    const oldDate = before ? devoirsService.formatEcheance(before) : null
 
     const result = devoirsService.updateDevoir(interaction.guildId, devoirId, patch)
     if (!result.ok) {
@@ -84,7 +84,7 @@ module.exports = {
         { name: 'Ancienne date', value: oldDate || 'Inconnue', inline: true },
         {
           name: 'Nouvelle date',
-          value: devoir.heure ? `${devoir.date} à ${devoir.heure}` : devoir.date,
+          value: devoirsService.formatEcheance(devoir),
           inline: true
         },
         {

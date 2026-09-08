@@ -8,6 +8,9 @@ const Parser = require('rss-parser');
 const { readRssConfig, readRssState, writeRssState } = require('./rssConfigStore');
 const { isFeatureEnabled } = require('./guildConfig');
 
+const { createLogger } = require('../utils/logger');
+
+const log = createLogger('rssRunner');
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const FEED_TIMEOUT_MS = 10_000;
 const MAX_SEEN_IDS_PER_FEED = 300;
@@ -46,7 +49,7 @@ async function checkFeed(client, guildId, feedId, feedCfg, state) {
     feed = await withTimeout(parser.parseURL(feedCfg.url), FEED_TIMEOUT_MS);
   } catch (error) {
     if (shouldLogError(feedId)) {
-      console.error(`[rssRunner] Flux inaccessible (${feedCfg.customName || feedCfg.url}):`, error.message);
+      log.error(`Flux inaccessible (${feedCfg.customName || feedCfg.url}):`, error.message);
     }
     return;
   }
@@ -78,7 +81,7 @@ async function checkFeed(client, guildId, feedId, feedCfg, state) {
     : Boolean(channel);
 
   if (!channel || !canSend) {
-    console.warn(`[rssRunner] Salon indisponible ou permissions manquantes pour le flux ${feedCfg.customName || feedId}.`);
+    log.warn(`Salon indisponible ou permissions manquantes pour le flux ${feedCfg.customName || feedId}.`);
     // On marque quand même comme vu pour ne pas re-tenter en boucle sur les mêmes articles.
     feedState.seenIds = mergeSeenIds(feedState.seenIds, items.map(itemKey));
     state.feeds[feedId] = feedState;
@@ -96,7 +99,7 @@ async function checkFeed(client, guildId, feedId, feedCfg, state) {
         allowedMentions: { parse: [] },
       });
     } catch (error) {
-      console.error(`[rssRunner] Échec d'envoi pour le flux ${feedCfg.customName || feedId}:`, error.message);
+      log.error(`Échec d'envoi pour le flux ${feedCfg.customName || feedId}:`, error.message);
     }
   }
 
@@ -132,7 +135,7 @@ async function runCycle(client) {
       writeRssState(guildId, state);
     }
   } catch (error) {
-    console.error('[rssRunner] Erreur pendant le cycle RSS:', error.message);
+    log.error('Erreur pendant le cycle RSS:', error.message);
   } finally {
     running = false;
   }
@@ -146,7 +149,7 @@ function startRssRunner(client, { intervalMs = DEFAULT_INTERVAL_MS } = {}) {
   if (started) return;
   started = true;
 
-  console.log(`📰 RssRunner démarré (interval ${intervalMs}ms)`);
+  log.info(`📰 RssRunner démarré (interval ${intervalMs}ms)`);
   runCycle(client);
   const timer = setInterval(() => runCycle(client), intervalMs);
   timer.unref?.();

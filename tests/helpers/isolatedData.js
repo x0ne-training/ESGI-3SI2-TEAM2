@@ -12,6 +12,10 @@ function useIsolatedDataDir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bot-test-data-'));
   process.env.BOT_DATA_DIR = dir;
 
+  // Les tests vérifient des comportements, pas des messages de log : on coupe
+  // la sortie pour garder le rapport de test lisible.
+  if (!process.env.LOG_LEVEL) process.env.LOG_LEVEL = 'silent';
+
   process.on('exit', () => {
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* déjà nettoyé */ }
   });
