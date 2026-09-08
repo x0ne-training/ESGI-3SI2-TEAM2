@@ -12,5 +12,11 @@ services:
     volumes:
       # Persistance des données du bot (devoirs, config par serveur, stats, RSS...)
       # entre les recreate/rebuild du conteneur.
+      #
+      # Depuis le schéma v2, les données sont rangées par serveur Discord dans
+      # data/guilds/<guildId>/. Ce montage unique les couvre toutes : aucun
+      # volume supplémentaire n'est à ajouter quand le bot rejoint un serveur.
+      # Le dossier hôte doit être accessible en écriture à l'UID 1000
+      # (utilisateur "node" du conteneur), y compris pour créer des sous-dossiers.
       - /volume2/docker/ESGI-3SI2-TEAM2/data:/app/data
     stop_grace_period: 10s

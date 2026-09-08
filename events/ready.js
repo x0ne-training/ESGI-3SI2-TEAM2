@@ -7,6 +7,8 @@ const { startRssRunner } = require('../services/rssRunner');
 const { startRecurringEvents } = require('../services/recurringEvents');
 const { startEventReminders } = require('../services/reminderSystem');
 const { startCooldownCleanup } = require('../services/feurEngine');
+const { ensureAllGuildsInitialized } = require('../services/guildLifecycle');
+const { getSchemaVersion, SCHEMA_VERSION } = require('../services/guildStore');
 
 let started = false;
 
@@ -25,7 +27,19 @@ module.exports = {
     if (started) return;
     started = true;
 
-    // Rebuild reminders depuis devoirs.json -> reminders.json
+    // Prépare data/guilds/<guildId>/ pour chaque serveur connu (idempotent).
+    const initialized = ensureAllGuildsInitialized(client);
+    console.log(`🗂️ Données prêtes pour ${initialized} serveur(s) — schéma v${getSchemaVersion()}.`);
+
+    const schemaVersion = getSchemaVersion();
+    if (schemaVersion < SCHEMA_VERSION) {
+      console.warn(
+        `⚠️ Schéma de données v${schemaVersion} détecté (attendu v${SCHEMA_VERSION}). ` +
+        'Lance `node scripts/migrate-data-v2.js --dry-run` puis la migration réelle.',
+      );
+    }
+
+    // Recalcule les rappels persistants de chaque serveur
     const { devoirsCount, createdCount } = devoirsService.rebuildAllReminders();
     console.log(`✅ Reminders JSON rebuild: ${createdCount} rappel(s) pending créé(s) pour ${devoirsCount} élément(s).`);
 

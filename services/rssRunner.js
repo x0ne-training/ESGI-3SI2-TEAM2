@@ -1,15 +1,13 @@
 // services/rssRunner.js
-// Runner RSS automatique : lit data/rss-config.json (flux configurés via
-// /rss-setup), vérifie périodiquement les nouveaux articles et les publie
-// dans le salon configuré. Mémorise les éléments déjà vus dans
-// data/rss-state.json pour ne jamais republier l'historique ni faire de
-// doublons après un redémarrage.
+// Runner RSS automatique : lit les flux configurés via /rss-setup
+// (data/guilds/<guildId>/rss-config.json), vérifie périodiquement les nouveaux
+// articles et les publie dans le salon configuré. Mémorise les éléments déjà
+// vus dans data/guilds/<guildId>/rss-state.json pour ne jamais republier
+// l'historique ni faire de doublons après un redémarrage.
 const Parser = require('rss-parser');
-const { readJson, writeJson } = require('./dataStore');
-const { readRssConfig } = require('./rssConfigStore');
+const { readRssConfig, readRssState, writeRssState } = require('./rssConfigStore');
 const { isFeatureEnabled } = require('./guildConfig');
 
-const STATE_FILE = 'rss-state.json';
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const FEED_TIMEOUT_MS = 10_000;
 const MAX_SEEN_IDS_PER_FEED = 300;
@@ -20,16 +18,6 @@ const parser = new Parser();
 let running = false;
 let started = false;
 const lastErrorLoggedAt = new Map(); // feedId -> timestamp
-
-function readState() {
-  const data = readJson(STATE_FILE, { feeds: {} });
-  if (!data || typeof data !== 'object' || !data.feeds) return { feeds: {} };
-  return data;
-}
-
-function writeState(state) {
-  writeJson(STATE_FILE, state);
-}
 
 function withTimeout(promise, ms) {
   return Promise.race([
@@ -127,20 +115,22 @@ async function runCycle(client) {
   running = true;
   try {
     const rssConfig = readRssConfig();
-    const state = readState();
-    let dirty = false;
 
+    // L'état est lu et écrit par serveur : aucun flux d'une guild ne peut
+    // marquer comme "déjà vu" un article d'une autre.
     for (const guildId of Object.keys(rssConfig)) {
       if (!isFeatureEnabled(guildId, 'rss')) continue;
 
       const guildFeeds = rssConfig[guildId] || {};
-      for (const [feedId, feedCfg] of Object.entries(guildFeeds)) {
-        await checkFeed(client, guildId, feedId, feedCfg, state);
-        dirty = true;
-      }
-    }
+      const feedIds = Object.keys(guildFeeds);
+      if (feedIds.length === 0) continue;
 
-    if (dirty) writeState(state);
+      const state = readRssState(guildId);
+      for (const feedId of feedIds) {
+        await checkFeed(client, guildId, feedId, guildFeeds[feedId], state);
+      }
+      writeRssState(guildId, state);
+    }
   } catch (error) {
     console.error('[rssRunner] Erreur pendant le cycle RSS:', error.message);
   } finally {
