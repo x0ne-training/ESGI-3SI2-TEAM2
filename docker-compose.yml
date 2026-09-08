@@ -12,5 +12,19 @@ services:
     volumes:
       # Persistance des données du bot (devoirs, config par serveur, stats, RSS...)
       # entre les recreate/rebuild du conteneur.
+      #
+      # Depuis le schéma v2, les données sont rangées par serveur Discord dans
+      # data/guilds/<guildId>/. Ce montage unique les couvre toutes : aucun
+      # volume supplémentaire n'est à ajouter quand le bot rejoint un serveur.
+      # Le dossier hôte doit être accessible en écriture à l'UID 1000
+      # (utilisateur "node" du conteneur), y compris pour créer des sous-dossiers.
       - /volume2/docker/ESGI-3SI2-TEAM2/data:/app/data
     stop_grace_period: 10s
+    # Rotation des logs : sans limite, le driver json-file par défaut grossit
+    # indéfiniment et peut saturer le disque du NAS.
+    # 3 fichiers de 10 Mo = 30 Mo d'historique conservé au maximum.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

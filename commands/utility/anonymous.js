@@ -3,6 +3,9 @@ const {
   PermissionFlagsBits,
   ChannelType,
   EmbedBuilder, MessageFlags } = require('discord.js');
+const { createLogger } = require('../../utils/logger');
+
+const log = createLogger('commands');
 
 // Empêche les pings @everyone, @here, rôles et users (normalement)
 function sanitizeForNoPings(text) {
@@ -87,7 +90,7 @@ module.exports = {
 
       await interaction.reply({ embeds: [confirm], flags: MessageFlags.Ephemeral });
     } catch (err) {
-      console.error("Anonymous send error:", err);
+      log.error("Anonymous send error:", err);
       await interaction.reply({
         content: "Une erreur est survenue lors de l’envoi du message.",
         flags: MessageFlags.Ephemeral,
